@@ -1,0 +1,129 @@
+/* Modal portals live under body, outside .native-app. Keep every dialog on
+   the same glass palette, including the separate operations/billing forms. */
+@media screen {
+  [data-ui-theme="mac"] .ant-modal {
+    --dialog-text:#26354b;
+    --dialog-muted:#6e7c91;
+    --dialog-line:#e2e9f2;
+    --dialog-surface:#f2f6fc;
+    color:var(--dialog-text);
+  }
+  [data-ui-theme="mac"] .ant-modal .ant-modal-container {
+    display:flex;flex-direction:column;max-height:calc(100dvh - 70px);
+    padding:28px;border:1px solid #fff;border-radius:24px;
+    background:#f9fbfef5;box-shadow:0 30px 100px #1b345e30;
+    backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  }
+  [data-ui-theme="mac"] .ant-modal .ant-modal-header {flex-shrink:0;margin-bottom:20px;padding-right:28px}
+  [data-ui-theme="mac"] .ant-modal .ant-modal-title {color:var(--dialog-text);font-size:22px;font-weight:650;line-height:1.5}
+  [data-ui-theme="mac"] .ant-modal .ant-modal-close {top:24px;right:24px;color:var(--dialog-muted);border-radius:10px}
+  [data-ui-theme="mac"] .ant-modal .ant-modal-body {min-height:0;max-height:none;overflow:auto;overscroll-behavior:contain;padding:0 5px 0 0;scrollbar-width:thin}
+  [data-ui-theme="mac"] .ant-modal .ant-modal-footer {flex-shrink:0;border-color:var(--dialog-line);margin-top:22px;padding-top:18px;gap:10px}
+  [data-ui-theme="mac"] .ant-modal :is(h2,h3,h4) {color:var(--dialog-text)}
+  [data-ui-theme="mac"] .ant-modal :is(.muted,small,.field>span:first-child,.session-detail p,.student-profile p,.roster>div>span) {color:var(--dialog-muted)}
+  [data-ui-theme="mac"] .ant-modal .field>span:first-child {font-weight:500}
+  [data-ui-theme="mac"] .ant-modal .form-grid {gap:12px 20px;margin:16px 0}
+  [data-ui-theme="mac"] .ant-modal :is(.dialog-intro,.availability-editor,.bill-preview) {background:var(--dialog-surface);border:1px solid var(--dialog-line);border-radius:14px;color:#526783;padding:16px 18px}
+  [data-ui-theme="mac"] .ant-modal .dialog-intro {margin-top:0;font-size:13px}
+  [data-ui-theme="mac"] .ant-modal :is(.assign-list>div,.roster>div,.attendance-list>div,.advanced-options,.history-row,.availability-list>div) {border-color:var(--dialog-line)}
+  [data-ui-theme="mac"] .ant-modal .advanced-options summary {color:#2769b8;font-size:13px}
+  [data-ui-theme="mac"] .ant-modal .advanced-options summary:focus-visible {outline:2px solid #007aff;outline-offset:4px;border-radius:4px}
+  [data-ui-theme="mac"] .ant-modal .bill-total {background:#eaf3ff;border:1px solid #d6e6fb;border-radius:14px}
+  [data-ui-theme="mac"] .ant-modal .bill-total span {color:#627792}
+  [data-ui-theme="mac"] .ant-modal :is(.bill-total b,.student-profile>b) {color:#176bce}
+  [data-ui-theme="mac"] .ant-modal .student-profile>.avatar {background:#e8f1ff;color:#2274d4}
+  [data-ui-theme="mac"] .ant-modal .ant-alert {border-radius:12px}
+  [data-ui-theme="mac"] .ant-modal .ant-btn {font-size:13px}
+  [data-ui-theme="mac"] .ant-modal .ant-btn-default:not(.ant-btn-dangerous):not(:disabled) {background:#fff;border-color:#d8e1ed;color:#526179}
+  [data-ui-theme="mac"] .ant-modal .ant-btn-default:not(.ant-btn-dangerous):not(:disabled):hover {background:#f0f6ff;border-color:#9fc5f4;color:#176bce}
+  [data-ui-theme="mac"] :is(.ant-select-dropdown,.ant-popover-container) {border:1px solid #e2e9f2;box-shadow:0 12px 36px #1b345e1a;border-radius:14px}
+  /* Preview follows the interface; print styles remain independent. */
+  [data-ui-theme="mac"] .ant-modal .invoice-paper {background:#fff;border-color:var(--dialog-line);border-radius:14px;color:var(--dialog-text)}
+  [data-ui-theme="mac"] .ant-modal .invoice-heading {border-color:#4589de}
+  [data-ui-theme="mac"] .ant-modal .invoice-heading b {color:#2274d4}
+  [data-ui-theme="mac"] .ant-modal .invoice-paper th {background:var(--dialog-surface);color:#627792}
+  [data-ui-theme="mac"] .ant-modal :is(.invoice-paper td,.invoice-totals h3,.invoice-foot) {border-color:var(--dialog-line)}
+  [data-ui-theme="mac"] .ant-modal .invoice-foot {color:var(--dialog-muted)}
+}
+@media screen and (max-width:640px) {
+  [data-ui-theme="mac"] .ant-modal {top:16px;padding-bottom:16px;max-width:calc(100% - 24px)}
+  [data-ui-theme="mac"] .ant-modal .ant-modal-container {max-height:calc(100dvh - 32px);padding:20px 16px;border-radius:20px}
+  [data-ui-theme="mac"] .ant-modal .ant-modal-title {font-size:20px}
+  [data-ui-theme="mac"] .ant-modal .ant-modal-close {top:19px;right:14px}
+  [data-ui-theme="mac"] .ant-modal .form-grid {grid-template-columns:minmax(0,1fr)}
+  [data-ui-theme="mac"] .ant-modal :is(.student-profile,.attendance-list>div,.roster>div) {flex-wrap:wrap}
+  [data-ui-theme="mac"] .ant-modal .ant-modal-footer .ant-btn {white-space:normal;height:auto}
+  [data-ui-theme="mac"] body:has(.demo-panel) .ant-modal .ant-modal-container {max-height:calc(58dvh - 26px)}
+}
+@media screen and (prefers-reduced-transparency:reduce) {
+  [data-ui-theme="mac"] .ant-modal .ant-modal-container {background:#f9fbfe;backdrop-filter:none;-webkit-backdrop-filter:none}
+}
+@media screen {
+  [data-ui-theme="mac"] .student-records-header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:4px 0 24px}
+  [data-ui-theme="mac"] .student-records-header h2{font-size:22px;margin:0 0 6px}
+  [data-ui-theme="mac"] .student-records-header p{margin:0;color:var(--dialog-muted)}
+  [data-ui-theme="mac"] .student-records-balance{text-align:right;flex-shrink:0}
+  [data-ui-theme="mac"] .student-records-balance span{display:block;font-size:12px;color:var(--dialog-muted);margin-bottom:6px}
+  [data-ui-theme="mac"] .student-records-balance b{font-size:22px;color:#176bce}
+  [data-ui-theme="mac"] .student-records .ant-table-wrapper{border:1px solid var(--dialog-line);border-radius:12px;overflow:hidden}
+}
+@media screen {
+  [data-ui-theme="mac"] .student-records-credits{display:flex;gap:28px;flex-shrink:0}
+  [data-ui-theme="mac"] .student-records-credits .student-records-balance:first-child b{color:var(--dialog-text)}
+}
+@media screen and (max-width:480px){
+  [data-ui-theme="mac"] .student-records-header{flex-wrap:wrap}
+  [data-ui-theme="mac"] .student-records-credits{gap:24px}
+}
+
+.teacher-avatar{overflow:hidden;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center}
+.teacher-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.teacher-avatar.teacher-avatar-large{width:64px;height:64px;border-radius:50%;font-size:24px}
+.teacher-avatar-controls,.teacher-profile-identity{display:flex;align-items:center;gap:18px;min-width:0}
+.teacher-avatar-editor .muted{font-size:12px;margin:10px 0 0;line-height:1.6}
+.teacher-avatar-editor .ant-alert{margin-top:12px}
+
+/* All portrait surfaces share a circular crop, including text fallbacks. */
+.avatar,.user-avatar,.native-account-avatar,.ant-avatar,
+[data-ui-theme="mac"] .avatar,[data-ui-theme="mac"] .native-master-items .avatar{border-radius:50%;overflow:hidden;aspect-ratio:1 / 1;flex-shrink:0}
+
+/* Shared popup surfaces, including portals outside dialogs. */
+[data-ui-theme="mac"] :is(.ant-select-dropdown,.ant-picker-dropdown .ant-picker-panel-container,.ant-dropdown .ant-dropdown-menu){background:#fbfdff!important;border:1px solid #e2e9f2!important;border-radius:16px!important;box-shadow:0 14px 40px #1b345e24!important;backdrop-filter:blur(20px)!important;color:#26354b!important}
+[data-ui-theme="mac"] .ant-select-dropdown{padding:6px!important}
+[data-ui-theme="mac"] .ant-select-item-option{border-radius:10px!important;min-height:36px!important;align-items:center!important}
+[data-ui-theme="mac"] .ant-select-item-option-active:not(.ant-select-item-option-disabled){background:#f0f6ff!important}
+[data-ui-theme="mac"] .ant-select-item-option-selected:not(.ant-select-item-option-disabled){background:#e8f2ff!important;color:#007aff!important;font-weight:600!important}
+[data-ui-theme="mac"] .ant-select-item-option-state{color:#007aff!important}
+[data-ui-theme="mac"] .system-temporal-input{min-height:40px!important;border-radius:12px!important;background:#fff!important;border-color:#d2d2d7!important;min-width:130px!important}
+[data-ui-theme="mac"] .field>.system-temporal-input{width:100%!important}
+[data-ui-theme="mac"] .ant-picker-dropdown .ant-picker-time-panel-column{padding:6px!important;scrollbar-width:thin!important;border-color:#e2e9f2!important}
+[data-ui-theme="mac"] .ant-picker-dropdown .ant-picker-time-panel-cell-inner{border-radius:8px!important;margin:2px 0!important;color:#526179!important;text-align:center!important;padding-inline:12px!important}
+[data-ui-theme="mac"] .ant-picker-dropdown .ant-picker-time-panel-cell-selected .ant-picker-time-panel-cell-inner{background:#e8f2ff!important;color:#007aff!important;font-weight:600!important}
+[data-ui-theme="mac"] .ant-picker-dropdown .ant-picker-time-panel-cell:not(.ant-picker-time-panel-cell-disabled) .ant-picker-time-panel-cell-inner:hover{background:#f0f6ff!important;color:#007aff!important}
+[data-ui-theme="mac"] .ant-picker-dropdown .ant-picker-cell-selected .ant-picker-cell-inner{background:#007aff!important;color:#fff!important;border-radius:8px!important}
+
+[data-ui-theme="mac"] .ant-modal .schedule-conflict-alert.ant-alert-success{background:#f0faf3!important;border-color:#cee8d6!important;color:#365a43}
+
+.session-roster-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px;flex-wrap:wrap}
+.session-roster-heading h3{margin:0}.session-add-students{display:flex;align-items:flex-end;gap:12px;margin:20px 0}.session-add-students .field{flex:1;min-width:0;margin:0}.roster small{display:block;margin-top:5px}
+@media(max-width:640px){.session-add-students{align-items:stretch;flex-direction:column}}
+
+/* Classroom details: equal emphasis for course, date, time and teacher. */
+.session-summary{padding:8px 0 20px;border-bottom:1px solid var(--dialog-line,#e2e9f2)}
+.session-summary-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px 28px;margin:18px 0 0}
+.session-summary-fields>div{display:grid;grid-template-columns:42px minmax(0,1fr);gap:12px;align-items:baseline}
+.session-summary-fields dt,.session-summary-fields dd{margin:0;font-size:14px;font-weight:400;line-height:1.6}
+.session-summary-fields dt{color:var(--dialog-muted,#6e7c91)}
+.session-summary-fields dd{color:var(--dialog-text,#26354b);overflow-wrap:anywhere}
+.session-students-table{margin-top:16px;overflow-x:auto}
+.session-students-table table{width:100%;border-collapse:collapse;text-align:left;font-size:14px}
+.session-students-table th{color:var(--dialog-muted,#6e7c91);font-size:12px;font-weight:500;background:var(--dialog-surface,#f2f6fc)}
+.session-students-table th,.session-students-table td{padding:14px 12px;border-bottom:1px solid var(--dialog-line,#e2e9f2);line-height:1.6}
+.session-students-table td{color:var(--dialog-text,#26354b);overflow-wrap:anywhere}
+@media(max-width:540px){.session-summary-fields{grid-template-columns:1fr;gap:12px}.session-students-table th,.session-students-table td{padding:12px 8px}}
+
+.session-attendance-select{width:130px}
+.session-add-students{display:flex;align-items:center;gap:12px;margin:0 0 12px}
+.session-add-students>.ant-select{flex:1;min-width:0}
+[data-ui-theme="mac"] .ant-modal .session-add-students>.ant-btn{height:40px;flex-shrink:0;margin:0}
+@media(max-width:640px){.session-add-students{flex-direction:row;align-items:center}.session-attendance-select{width:110px}}

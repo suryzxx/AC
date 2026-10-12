@@ -36,10 +36,58 @@ export function availability(t, date) {
   }
   return ranges;
 }
+const additionalDemoStudents = () => [
+  ['周芷妍', 'Zoe', 'P3', 0], ['吳俊熙', 'Ryan', 'P4', 1],
+  ['鄭曉彤', 'Sophie', 'P5', 2], ['王柏翰', 'Alex', 'P6', 12],
+  ['梁雅晴', 'Grace', 'P3', 7], ['許朗軒', 'Leo', 'P4', 0, 'single'],
+  ['劉心怡', 'Lily', 'P5', 1], ['馮子睿', 'Noah', 'P6', 2],
+  ['蔡穎恩', 'Ella', 'P3', 0], ['曾皓宇', 'Oliver', 'P4', 4],
+  ['潘樂瑤', 'Mia', 'P5', 9], ['謝承希', 'James', 'P6', 0, 'single'],
+  ['蘇詠晴', 'Chloe', 'P3', 2], ['葉俊朗', 'Henry', 'P4', 1],
+  ['羅思穎', 'Alice', 'P5', 0], ['郭梓軒', 'Daniel', 'P6', 6],
+  ['鄧凱晴', 'Charlotte', 'P3', 11], ['黃宇謙', 'Oscar', 'P4', 0, 'single']
+].map(([name, english, grade, balance, mode = 'package'], index) => ({
+  id: `demo-student-${index + 7}`, name, english, grade, balance, mode,
+  parent: `${name[0]}${index % 2 ? '先生' : '太'}`,
+  phone: `+852 6900 ${String(index + 101).padStart(4, '0')}`,
+  notes: '模擬學生資料，供操作演示使用。'
+}));
+
+// Extend older browser demos once without overwriting edited or added records.
+export function upgradeDemoStudents(db) {
+  if (db.demoStudentsVersion >= 1) return db;
+  const ids = new Set(db.students.map(student => student.id));
+  return {
+    ...db,
+    demoStudentsVersion: 1,
+    students: [...db.students, ...additionalDemoStudents().filter(student => !ids.has(student.id))]
+  };
+}
+
+// Add the requested sample once, preserving existing course and teacher edits.
+export function upgradeDemoCourses(db) {
+  if (db.demoCoursesVersion >= 1) return db;
+  const existing = db.courses.find(c => c.id === 'demo-trial-course' || ['體驗課', '体验课'].includes(c.name));
+  if (existing) return { ...db, demoCoursesVersion: 1 };
+  const course = { id: 'demo-trial-course', name: '體驗課', price: 100, color: '#4977c8', description: '體驗課程內容，了解學生程度與學習需要。' };
+  return {
+    ...db, demoCoursesVersion: 1,
+    courses: [...db.courses, course],
+    teachers: db.teachers.map(t => ({ ...t, subjects: [...t.subjects, course.id] }))
+  };
+}
+
+export function upgradeDemoAvatars(db) {
+  if (db.demoAvatarsVersion >= 1) return db;
+  const avatars = { t1: '/avatars/avatar-01.png', t2: '/avatars/avatar-02.png', t3: '/avatars/avatar-03.png' };
+  return { ...db, demoAvatarsVersion: 1, teachers: db.teachers.map(t => avatars[t.id] ? { ...t, avatar: avatars[t.id] } : t) };
+}
+
 export function seed() {
   const d = todayHK();
   return {
     version: 3,
+    demoStudentsVersion: 1,
     students: [{
       id: 's1',
       name: '陳梓晴',
@@ -100,31 +148,29 @@ export function seed() {
       balance: 10,
       mode: 'package',
       notes: ''
-    }],
+    }, ...additionalDemoStudents()],
     courses: [{
       id: 'c1',
       name: '英文閱讀',
       color: '#4977c8',
       price: 280,
-      limit: 3,
       description: '按程度搭配，可一對一或 2–3 人同行。'
     }, {
       id: 'c2',
       name: '英文寫作',
       color: '#9675c8',
       price: 320,
-      limit: 2,
       description: '針對作文、文法與學校功課。'
     }, {
       id: 'c3',
       name: '口語與面試',
       color: '#cb8b43',
       price: 380,
-      limit: 1,
       description: '一對一練習表達及升中面試。'
     }],
     teachers: [{
       id: 't1',
+      avatar: '/avatars/avatar-01.png',
       name: '李健',
       english: 'Mr. Lee',
       type: 'full',
@@ -139,6 +185,7 @@ export function seed() {
       color: '#37786a'
     }, {
       id: 't2',
+      avatar: '/avatars/avatar-02.png',
       name: '周雅雯',
       english: 'Ms. Chow',
       type: 'full',
@@ -153,6 +200,7 @@ export function seed() {
       color: '#5577b1'
     }, {
       id: 't3',
+      avatar: '/avatars/avatar-03.png',
       name: '黃思敏',
       english: 'Ms. Wong',
       type: 'part',
@@ -270,14 +318,12 @@ export function validateSessions(db, drafts, excludeId) {
     const prefix = `${b.date}：`;
     if (!t || !c || !b.studentIds.length) return prefix + '請選擇老師、課程和學生';
     if (mins(b.start) >= mins(b.end)) return prefix + '結束時間必須晚於開始時間';
-    if (b.studentIds.length > c.limit) return prefix + `此課程每次最多 ${c.limit} 人`;
     if (!t.subjects.includes(c.id)) return prefix + '老師未設定可教此課程';
     if (b.studentIds.some(id => !t.grades.includes(db.students.find(s => s.id === id)?.grade))) return prefix + '老師的可教年級與學生不符';
     if (!availability(t, b.date).some(w => mins(w.start) <= mins(b.start) && mins(w.end) >= mins(b.end))) return prefix + '老師尚未確認這個時段可授課';
     for (const old of [...db.sessions, ...accepted].filter(x => x.id !== excludeId && x.status !== 'cancelled' && x.date === b.date)) {
       if (!overlap(b, old)) continue;
       if (old.teacherId === b.teacherId) return prefix + '老師時間衝突';
-      if (old.room === b.room) return prefix + '課室已被使用';
       if (old.studentIds.some(id => b.studentIds.includes(id))) return prefix + '學生已有其他課堂';
     }
     accepted.push(b);
@@ -321,6 +367,16 @@ export function completeSession(db, id, attendance, note) {
     }, ...db.history]
   };
 }
+// Save the full roster atomically; corrections retain the existing reversal audit.
+export function saveSessionAttendance(db, id, attendance, reason = '') {
+  const lesson = db.sessions.find(session => session.id === id);
+  if (!lesson || lesson.status === 'cancelled') throw Error('此課堂不能記錄考勤');
+  if (lesson.studentIds.some(studentId => !['present', 'late', 'leave', 'absent'].includes(attendance[studentId]))) throw Error('請逐位確認出勤');
+  if (lesson.status === 'completed' && lesson.studentIds.every(studentId => lesson.attendance?.[studentId] === attendance[studentId])) return db;
+  const next = lesson.status === 'completed' ? reverseAttendance(db, id, reason) : db;
+  return completeSession(next, id, Object.fromEntries(lesson.studentIds.map(studentId => [studentId, attendance[studentId]])), lesson.note || '');
+}
+
 export function totals(lines, surcharge, kind, value) {
   const subtotal = Math.round(lines.reduce((n, x) => n + x.quantity * x.unitPrice, 0) * 100) / 100;
   const discount = Math.round((kind === 'percent' ? subtotal * value / 100 : value) * 100) / 100;
@@ -696,4 +752,97 @@ export function suggestSlot(db, draft, from, to, duration = 60, excludeId) {
     }
   }
   return null;
+}
+
+// Opening credit records lessons already purchased, without creating a new payment.
+export function addStudentWithLessons(db, profile, purchasedLessons) {
+  if (!Number.isSafeInteger(purchasedLessons) || purchasedLessons < 0) throw Error('請輸入 0 或以上的整數課時');
+  const student = {
+    id: uid(), name: profile.name, english: profile.english, grade: profile.grade,
+    parent: profile.parent, phone: profile.phone, notes: profile.notes,
+    mode: 'package', balance: purchasedLessons
+  };
+  return {
+    ...db,
+    students: [...db.students, student],
+    ledger: purchasedLessons ? [...db.ledger, {
+      id: uid(), studentId: student.id, date: todayHK(), delta: purchasedLessons,
+      type: '初始課時錄入', note: `建檔時錄入已購買 ${purchasedLessons} 堂`
+    }] : db.ledger,
+    history: [{ id: uid(), at: new Date().toISOString(), text: `新增學生 ${student.name} · 已購買 ${purchasedLessons} 堂` }, ...db.history]
+  };
+}
+
+// Retire per-lesson billing for current students and uncompleted bookings.
+// Completed lessons and financial history retain their original snapshots.
+export function usePurchasedLessonCredits(db) {
+  const convert = b => ({ ...b, charges: Object.fromEntries(b.studentIds.map(id => [id, { ...lessonCharge(db, b, id), mode: 'package' }])) });
+  return {
+    ...db,
+    students: db.students.map(s => ({ ...s, mode: 'package' })),
+    sessions: db.sessions.map(b => b.status === 'scheduled' ? convert(b) : b),
+    requests: db.requests.map(r => r.proposal ? { ...r, proposal: r.proposal.map(convert) } : r)
+  };
+}
+
+// Opening balance plus net purchases equals remaining credit plus valid usage.
+// Reversed attendance and unpaid/pending deductions do not count as usage.
+export function totalStudentLessons(db, studentId) {
+  const remaining = db.students.find(s => s.id === studentId)?.balance || 0;
+  const used = db.ledger.filter(l => l.studentId === studentId && l.type === '上課扣減' && !l.reversed)
+    .reduce((sum, l) => sum - l.delta, 0);
+  return remaining + used;
+}
+
+// A one-time set of current-week examples for the prototype calendar.
+export function upgradeDemoCalendar(db, referenceDate = todayHK()) {
+  if (db.demoCalendarVersion >= 1) return db;
+  const monday = dateAdd(referenceDate, -((new Date(referenceDate + 'T12:00:00').getDay() + 6) % 7));
+  const dates = Array.from({ length: 6 }, (_, i) => dateAdd(monday, i));
+  let next = { ...db, sessions: [...db.sessions], teachers: db.teachers.map(t => {
+    if (t.id !== 't3') return t;
+    const extra = dates.slice(0, 3).filter(date => !availability(t, date).length)
+      .map(date => ({ date, start: '11:00', end: '18:00' }));
+    return { ...t, extra: [...t.extra, ...extra] };
+  }) };
+  for (const [teacherId, studentId] of [['t1', 's1'], ['t2', 's3'], ['t3', 's6']]) {
+    const teacher = next.teachers.find(t => t.id === teacherId);
+    if (!teacher || !next.students.some(s => s.id === studentId)) continue;
+    const courseId = teacher.subjects.find(id => next.courses.some(c => c.id === id));
+    if (!courseId) continue;
+    for (let index = 0; index < 3; index++) {
+      let lesson;
+      const preferredDates = [...dates.slice(index), ...dates.slice(0, index)];
+      for (const date of preferredDates) {
+        for (let hour = 11; hour < 18 && !lesson; hour++) {
+          for (const room of ['A', 'B']) {
+            const draft = { id: `demo-calendar-${teacherId}-${index}`, date,
+              start: `${hour}:00`, end: `${hour + 1}:00`, courseId, teacherId,
+              studentIds: [studentId], room, status: 'scheduled', attendance: {},
+              note: '模擬課堂 · 本週排課展示' };
+            if (!validateSessions(next, [draft])) { lesson = draft; break; }
+          }
+        }
+        if (lesson) break;
+      }
+      if (!lesson) continue;
+      next = { ...next, sessions: [...next.sessions, lesson] };
+      if (index === 0) next = completeSession(next, lesson.id, { [studentId]: 'present' }, '模擬已完成課堂 · 已記錄出席及扣減課時');
+    }
+  }
+  return { ...next, demoCalendarVersion: 1 };
+}
+
+export function addSessionStudents(db, sessionId, studentIds) {
+  const session = db.sessions.find(s => s.id === sessionId);
+  if (!session || session.status !== 'scheduled') throw Error('只有未完成課堂可以增加學生');
+  const additions = [...new Set(studentIds)].filter(id => !session.studentIds.includes(id));
+  if (!additions.length) throw Error('請選擇要增加的學生');
+  if (additions.some(id => !db.students.some(s => s.id === id))) throw Error('學生資料不存在');
+  const updated = { ...session, studentIds: [...session.studentIds, ...additions],
+    charges: { ...session.charges, ...Object.fromEntries(additions.map(id => [id, lessonCharge(db, session, id)])) } };
+  const conflict = validateSessions(db, [updated], sessionId);
+  if (conflict) throw Error(conflict);
+  return { ...db, sessions: db.sessions.map(s => s.id === sessionId ? updated : s),
+    history: audit(db, `課堂增加學生：${additions.map(id => studentName(db, id)).join('、')} · ${session.date} ${session.start}`) };
 }

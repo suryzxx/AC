@@ -1,0 +1,119 @@
+/* Shared Apple-inspired component styling.
+   Screen-only scope keeps invoice printing independent of the app layout. */
+@media screen {
+  html[data-ui-theme="mac"] {
+    --mac-text:#1d1d1f; --mac-muted:#6e6e73; --mac-line:#e5e5ea;
+    --mac-blue:#007aff; --mac-surface:#fff; --mac-tint:#eaf3ff;
+    background:#f5f5f7;
+  }
+  [data-ui-theme="mac"] body {background:#f5f5f7;color:var(--mac-text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","PingFang SC",sans-serif;-webkit-font-smoothing:antialiased}
+  [data-ui-theme="mac"] .sidebar {background:linear-gradient(155deg,#edf0f8eb,#f1f1f4e6 55%,#e9edf4eb);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-right:1px solid #d8dae1;padding-top:26px}
+  [data-ui-theme="mac"] .brand {gap:12px;margin-bottom:34px}
+  [data-ui-theme="mac"] .brand>span {font-size:38px;letter-spacing:-3px;color:#252528}
+  [data-ui-theme="mac"] .brand-dot {color:#007aff}
+  [data-ui-theme="mac"] .brand>div {color:#424249;letter-spacing:1.4px}
+  [data-ui-theme="mac"] .brand small {color:#808087;letter-spacing:2px}
+  [data-ui-theme="mac"] .workspace-label {color:#85858c;font-size:11px;letter-spacing:.3px;font-weight:600}
+  [data-ui-theme="mac"] .workspace-label span {background:#dedfe580;color:#74747c;border-radius:5px}
+  [data-ui-theme="mac"] nav {gap:4px}
+  [data-ui-theme="mac"] nav button {color:#42424a;padding:10px 13px;gap:11px;border-radius:8px;font-size:13px;transition:background .15s}
+  [data-ui-theme="mac"] nav button>.anticon {color:#007aff;font-size:18px}
+  [data-ui-theme="mac"] nav button:hover {background:#dfe3eb8c}
+  [data-ui-theme="mac"] nav button.selected {background:#d8e6fb;color:#164b90;font-weight:600;box-shadow:inset 0 0 0 1px #007aff08}
+  [data-ui-theme="mac"] nav em {background:#c7d9f3;color:#245698;border-radius:9px;min-width:18px;text-align:center}
+  [data-ui-theme="mac"] .sidebar-bottom {color:#777780;border-top:1px solid #d8dae1;margin-inline:12px;padding:18px 0 0}
+  [data-ui-theme="mac"] .sidebar-bottom small {color:#8e8e95}
+  [data-ui-theme="mac"] .topbar {min-height:68px;height:auto;padding-block:14px;background:#fafafbcc;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid #dedee3;gap:18px}
+  [data-ui-theme="mac"] .breadcrumb {color:#8e8e93;white-space:nowrap}
+  [data-ui-theme="mac"] .breadcrumb b {color:#3a3a3e;font-weight:600}
+  [data-ui-theme="mac"] .breadcrumb span {color:#c2c2c8}
+  [data-ui-theme="mac"] .role-switch {gap:8px}
+  [data-ui-theme="mac"] .demo-badge {color:#8e8e93;border-color:#dcdce1;border-radius:5px;background:#f0f0f3}
+  [data-ui-theme="mac"] .user-avatar {background:#e5e5ea;color:#686870;border-radius:50%}
+  [data-ui-theme="mac"] .content {padding-top:30px}
+  [data-ui-theme="mac"] h1 {font-size:28px;font-weight:700;letter-spacing:-.6px;color:#1d1d1f}
+  [data-ui-theme="mac"] .page-title h1 {font-size:26px}
+  [data-ui-theme="mac"] :is(.hero p,.page-title p,.muted,small,.field>span:first-child,.session-detail p,.student-profile p) {color:var(--mac-muted)}
+  [data-ui-theme="mac"] .eyebrow {color:#86868b;letter-spacing:1.5px}
+  [data-ui-theme="mac"] :is(.panel,.metric,.demo-handbook) {background:#fff;border:1px solid #e3e3e8;border-radius:14px;box-shadow:0 2px 8px #1d1d1f04,0 1px 2px #1d1d1f03}
+  [data-ui-theme="mac"] .panel {padding:22px}
+  [data-ui-theme="mac"] .panel-title h3 {font-size:14px;color:#29292d}
+  [data-ui-theme="mac"] .panel-title>.ant-btn {color:#007aff}
+  [data-ui-theme="mac"] .metric {padding:22px 24px}
+  [data-ui-theme="mac"] .metric:after {background:#e8f2ff;border:0;width:8px;height:8px;border-radius:50%}
+  [data-ui-theme="mac"] .metric>span {color:#6e6e73;font-weight:500}
+  [data-ui-theme="mac"] .metric>b {font-size:34px;font-weight:650;letter-spacing:-1.2px;font-variant-numeric:tabular-nums}
+  [data-ui-theme="mac"] .metric small {color:#8e8e93}
+  [data-ui-theme="mac"] .metric[role=button]:is(:hover,:focus-visible) {border-color:#8bbcff;box-shadow:0 2px 12px #007aff0c}
+  [data-ui-theme="mac"] .ant-btn:not(.ant-btn-icon-only) {min-height:34px;padding-block:6px;line-height:1.45}
+  [data-ui-theme="mac"] .ant-btn.ant-btn-sm:not(.ant-btn-icon-only) {min-height:28px;padding-block:4px}
+  [data-ui-theme="mac"] .ant-btn.ant-btn-lg:not(.ant-btn-icon-only) {min-height:40px;padding-block:8px}
+  [data-ui-theme="mac"] .ant-btn-primary:not(.ant-btn-dangerous):not(:disabled) {background:linear-gradient(#1685ff,#0072ef);border-color:#0070e8;box-shadow:0 1px 2px #0060ca26,inset 0 1px 0 #ffffff24}
+  [data-ui-theme="mac"] .ant-btn-primary:not(.ant-btn-dangerous):not(:disabled):hover {background:#0069df}
+  [data-ui-theme="mac"] .ant-btn.button-soft:not(:disabled) {background:#edf5ff;border-color:#cdddF5;color:#0066cc}
+  [data-ui-theme="mac"] .ant-btn.button-soft:not(:disabled):hover {background:#deecff;border-color:#a3c6f8;color:#0057b3}
+  [data-ui-theme="mac"] button:focus-visible {outline:3px solid #007aff70;outline-offset:3px}
+  [data-ui-theme="mac"] .ant-segmented {padding:3px;border:1px solid #00000004;border-radius:8px}
+  [data-ui-theme="mac"] .ant-segmented-item-selected {box-shadow:0 1px 4px #0000001a}
+  [data-ui-theme="mac"] .ant-table {color:#303034;font-size:13px!important}
+  [data-ui-theme="mac"] .ant-table-thead th {font-size:12px;font-weight:600!important}
+  [data-ui-theme="mac"] .ant-table-wrapper .ant-table-tbody>tr>td {padding-block:16px}
+  [data-ui-theme="mac"] .ant-table-tbody>tr:nth-child(even)>td {background:#fafafb}
+  [data-ui-theme="mac"] .ant-table-tbody>tr:hover>td {background:#f0f6ff}
+  [data-ui-theme="mac"] :is(.warm-note,.billing-callout,.dialog-intro,.bill-total,.handbook-grid section) {background:#f0f5fd;border-color:#dce7f7;color:#3d608d;border-radius:12px}
+  [data-ui-theme="mac"] :is(.warm-note p,.billing-callout p,.billing-callout>.anticon,.dialog-intro,.bill-total span,.bill-total b) {color:#446487}
+  [data-ui-theme="mac"] :is(.history-row,.task-row,.availability-list>div,.roster>div,.attendance-list>div,.teacher-calendar-toolbar,.teacher-card-actions) {border-color:#ededf0}
+  [data-ui-theme="mac"] :is(.availability-list span,.teacher-summary,.calendar-legend,.teacher-profile-edit,.teacher-profile-bottom,.board-note,.time-label,.lane-head small) {color:#76767d}
+  [data-ui-theme="mac"] :is(.teacher-summary b,.teacher-profile-bottom b,.student-profile>b) {color:#0066cc}
+  [data-ui-theme="mac"] .teacher-profile.selected {border-color:#78b3ff;box-shadow:0 0 0 2px #007aff18}
+  [data-ui-theme="mac"] .teacher-profiles .teacher-profile {padding:0}
+  [data-ui-theme="mac"] .teacher-select:hover {background:#f5f9ff}
+  [data-ui-theme="mac"] .teacher-profile-edit {color:#6e6e73}
+  [data-ui-theme="mac"] :is(.teacher-calendar-scroll,.board-scroll) {border-color:#e5e5ea;border-radius:10px}
+  [data-ui-theme="mac"] .teacher-week-head {background:#fafafb;border-color:#e5e5ea;color:#76767d}
+  [data-ui-theme="mac"] .teacher-week-head b {color:#37373d;font-weight:600}
+  [data-ui-theme="mac"] .teacher-week-head.is-today {background:#edf5ff;color:#007aff}
+  [data-ui-theme="mac"] .teacher-week-head.is-today b {background:#007aff;color:white;padding:3px 10px;border-radius:20px}
+  [data-ui-theme="mac"] :is(.calendar-empty,.availability-editor) {background:#f5f5f7;color:#6e6e73;border-radius:8px}
+  [data-ui-theme="mac"] :is(.available,.teacher-available) {background:#edf5ffb3;border-color:#dae8fa;color:#6689af}
+  [data-ui-theme="mac"] .available-key {background:#dae8fa}
+  [data-ui-theme="mac"] :is(.lesson,.week-lesson,.teacher-calendar-lesson) {background:#edf5ff;border-color:#d2e5fd;border-left-color:#007aff;color:#285e99;border-radius:6px;box-shadow:0 1px 3px #00000006}
+  [data-ui-theme="mac"] :is(.lesson.done,.teacher-calendar-lesson.completed) {background:#eef8f0;border-color:#d3ead8;border-left-color:#34a853;color:#356b42}
+  [data-ui-theme="mac"] .week-board>section {background:#f5f5f7}
+  [data-ui-theme="mac"] .request-card button {background:#fff;border-color:#d2d2d7;color:#0066cc}
+  [data-ui-theme="mac"] .ant-modal .ant-modal-container {background:#fcfcfd;border:1px solid #ffffffb3;box-shadow:0 24px 80px #00000026,0 0 0 1px #0000000a;border-radius:14px}
+  [data-ui-theme="mac"] .ant-modal .ant-modal-header {background:transparent}
+  [data-ui-theme="mac"] .ant-modal .ant-modal-footer {border-color:#e5e5ea}
+  [data-ui-theme="mac"] .ant-modal-mask {background:#17192338;backdrop-filter:blur(4px)}
+  [data-ui-theme="mac"] .demo-panel {background:#fafafcf5;border-color:#dcdce3;box-shadow:-8px 0 32px #00000008;backdrop-filter:blur(20px)}
+  [data-ui-theme="mac"] :is(.sandbox-note,.sandbox-banner) {background:#edf5ff;border-color:#c8ddf8;color:#46688d}
+  [data-ui-theme="mac"] .scenario-button {border-color:#e0e0e6;color:#303034;border-radius:10px;box-shadow:0 1px 2px #00000004}
+  [data-ui-theme="mac"] .scenario-button:hover {background:#f0f6ff;border-color:#a1c8ff}
+  [data-ui-theme="mac"] :is(.demo-intro,.demo-hint,.demo-running-title p,.demo-current-step p,.scenario-button small,.handbook-lead,.handbook-scenario p,.handbook-scenario li) {color:#6e6e73}
+  [data-ui-theme="mac"] :is(.demo-current-step h2,.scenario-button>.anticon,.demo-step-list li.active) {color:#0066cc}
+  [data-ui-theme="mac"] .demo-progress {background:#e5e5ea}
+  [data-ui-theme="mac"] .demo-progress span {background:#007aff}
+  [data-ui-theme="mac"] .demo-step-list li.active span {background:#e1eeff}
+  [data-ui-theme="mac"] .demo-route {border-color:#bfd8fb;color:#56779e}
+  [data-ui-theme="mac"] :is(.demo-handbook th,.handbook-grid section) {background:#f5f5f7}
+  [data-ui-theme="mac"] footer {color:#929299;border-top:1px solid #e5e5ea;padding-top:20px}
+}
+@media screen and (max-width:1100px) {
+  [data-ui-theme="mac"] .topbar {flex-wrap:wrap}
+  [data-ui-theme="mac"] .role-switch {justify-content:flex-start}
+}
+@media screen and (max-width:760px) {
+  [data-ui-theme="mac"] .sidebar {padding:20px 6px}
+  [data-ui-theme="mac"] .brand {margin-bottom:25px}
+  [data-ui-theme="mac"] .brand>span {font-size:32px}
+  [data-ui-theme="mac"] nav button {padding:13px 8px}
+  [data-ui-theme="mac"] .content {padding:22px 14px}
+  [data-ui-theme="mac"] .panel {padding:16px}
+  [data-ui-theme="mac"] .teacher-profiles .teacher-profile {padding:0}
+  [data-ui-theme="mac"] .ant-btn:not(.ant-btn-icon-only) {min-height:38px}
+  [data-ui-theme="mac"] .topbar {padding:12px 14px}
+}
+@media screen and (prefers-reduced-transparency:reduce) {
+  [data-ui-theme="mac"] :is(.sidebar,.topbar,.demo-panel) {background:#f0f0f4;backdrop-filter:none}
+  [data-ui-theme="mac"] .ant-modal-mask {backdrop-filter:none}
+}

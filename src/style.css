@@ -2,7 +2,7 @@
 @media(min-width:1600px){.home-grid{grid-template-columns:minmax(0,1fr) 330px}.content{padding:40px 46px}.sidebar{width:244px}.app>main{margin-left:244px}}
 @media(max-width:1150px){.home-grid{grid-template-columns:1fr}.side-stack{grid-template-columns:1.4fr 1fr}.teacher-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.content{padding:25px}.hero h1{font-size:25px}.sidebar{width:202px}.app>main{margin-left:202px}.topbar{padding:0 25px}}
 @media(max-width:760px){.sidebar{width:65px;padding:20px 6px}.brand{padding:0;margin-bottom:25px;justify-content:center}.brand>span{font-size:32px}.brand>div,.workspace-label,.sidebar-bottom,nav button>span:not(.anticon),nav em{display:none}nav button{justify-content:center;padding:15px 8px}.app>main{margin-left:65px}.topbar{height:65px;padding:0 14px}.breadcrumb,.demo-badge,.user-avatar{display:none!important}.role-switch{gap:7px}.content{padding:20px 14px}.hero{align-items:flex-start;flex-direction:column}.hero h1{font-size:24px}.hero p{font-size:12px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.metric{padding:16px}.metric b{font-size:29px}.metric small{font-size:10px}.metric:after{right:12px;top:20px}.panel{padding:16px}.panel-title{flex-wrap:wrap}.side-stack,.teacher-cards{grid-template-columns:1fr}.page-title{flex-direction:column;align-items:flex-start}.page-title h1{font-size:23px}.form-grid{grid-template-columns:1fr}.assign-list>div{align-items:flex-start;flex-direction:column}.assign-list .ant-select{width:100%!important}.billing-callout{flex-wrap:wrap}.billing-callout button{margin-left:0}.bill-total{flex-direction:column;align-items:flex-start}.invoice-paper{padding:15px}.invoice-meta{gap:14px}.invoice-heading h2{font-size:17px}.invoice-heading b{font-size:36px}footer{line-height:1.8;font-size:9px;gap:15px}.modal-actions{flex-wrap:wrap}}
-@media print{body>*{visibility:hidden}body .print-documents,body .print-documents *{visibility:visible}.ant-modal-root .ant-modal-mask,.ant-modal-header,.ant-modal-footer,.ant-modal-close{display:none!important}.ant-modal-root .ant-modal-wrap{position:absolute;inset:0;overflow:visible}.ant-modal-root .ant-modal{width:100%!important;max-width:none;top:0;margin:0;padding:0}.ant-modal-content,.ant-modal-body{padding:0!important;box-shadow:none!important;overflow:visible!important}.print-documents{position:absolute;left:0;top:0;width:100%}.invoice-paper{border:0;padding:12mm;margin:0;break-after:page}.invoice-paper:last-child{break-after:auto}@page{size:A4;margin:12mm}}
+@media print{body>*{visibility:hidden}body .print-documents,body .print-documents *{visibility:visible}.ant-modal-root .ant-modal-mask,.ant-modal-header,.ant-modal-footer,.ant-modal-close{display:none!important}.ant-modal-root .ant-modal-wrap{position:absolute;inset:0;overflow:visible}.ant-modal-root .ant-modal{width:100%!important;max-width:none;top:0;margin:0;padding:0}.ant-modal-container,.ant-modal-body{padding:0!important;box-shadow:none!important;overflow:visible!important}.print-documents{position:absolute;left:0;top:0;width:100%}.invoice-paper{border:0;padding:12mm;margin:0;break-after:page}.invoice-paper:last-child{break-after:auto}@page{size:A4;margin:12mm}}
 .ant-modal{top:35px}.ant-modal .ant-modal-body{max-height:calc(100dvh - 210px);overflow-y:auto;padding-right:5px}.ant-modal .ant-modal-footer{padding-top:8px}@media print{.ant-modal .ant-modal-body{max-height:none;overflow:visible;padding:0}}
 .role-switch{flex-wrap:wrap;justify-content:flex-end}.language-select{flex-shrink:0}@media(max-width:760px){.topbar{height:auto;min-height:65px;padding-top:12px;padding-bottom:12px}.role-switch{justify-content:flex-start}}
 /* Scenario presenter: kept outside the app and modal workspace. */
@@ -15,3 +15,66 @@
 .day-adjust{font-size:12px;width:100%;order:3;color:#6f8265}.day-adjust summary{cursor:pointer;padding:5px 0}.day-adjust .actions{flex-wrap:wrap;padding-top:8px}.day-adjust .ant-input{width:115px}.day-adjust .ant-select{width:90px}.assignment-day>.ant-checkbox-wrapper{margin-left:auto}
 
 .handbook-main{padding-left:24px}.handbook-main>li{padding:0 0 14px 8px}.handbook-main h3,.handbook-grid h3{font-size:17px;margin:0 0 8px}.demo-handbook p{font-size:14px;line-height:1.85}.handbook-main p{margin:7px 0}.handbook-branches details{border-bottom:1px solid #e1e8da;padding:14px 0;break-inside:avoid}.handbook-branches summary{cursor:pointer;font-size:15px;font-weight:600}.handbook-branches summary:focus-visible{outline:2px solid #617d4f;outline-offset:5px}.handbook-branches p{margin:10px 0 0;padding-left:18px}
+
+/* Shared action rhythm: intrinsic widths, clear hierarchy and roomy hit areas. */
+.ant-btn{gap:8px;transition:background .18s,border-color .18s,box-shadow .18s,color .18s}
+.ant-btn:not(.ant-btn-icon-only){height:auto;min-height:38px;padding-block:8px;white-space:normal;line-height:1.45}
+.ant-btn.ant-btn-sm:not(.ant-btn-icon-only){min-height:30px;padding-block:5px}
+.ant-btn.ant-btn-lg:not(.ant-btn-icon-only){min-height:44px;padding-block:10px}
+.ant-btn:focus-visible,button:focus-visible{outline:3px solid #86b3a1;outline-offset:3px}
+.ant-btn.ant-btn-icon-only{flex-shrink:0}
+.actions{gap:10px;row-gap:10px}
+.actions>.ant-btn{flex-shrink:0;max-width:100%}
+.hero>.ant-btn,.page-title>.ant-btn{flex-shrink:0}
+.hero .ant-btn{height:auto}
+.panel-title{flex-wrap:wrap;row-gap:14px}
+.panel-title>.actions{margin-left:auto;max-width:100%;justify-content:flex-end}
+.panel-title>.ant-btn{font-size:12px;padding-inline:12px}
+.ant-table-cell .actions{gap:8px;min-width:160px}
+.ant-table-cell .ant-btn{font-size:12px}
+.ant-btn.button-soft:not(:disabled){background:#eaf3ed;border-color:#d4e5da;color:#236b59}
+.ant-btn.button-soft:not(:disabled):hover{background:#dcecdf;border-color:#9ebdab;color:#194f42}
+.teacher-card{display:flex;flex-direction:column}
+.teacher-card .teacher-summary{margin-top:auto;padding-top:22px}
+.teacher-card-actions{border-top:1px solid #edf0e9;padding-top:16px;display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.teacher-card-actions>.actions{width:100%;gap:10px}
+.teacher-card-actions .ant-btn{font-size:12px;padding-inline:12px}
+.teacher-card-actions .teacher-profile-action{color:#73867b;padding-inline:8px;margin-left:-8px}
+.unavailable-notice{display:flex;align-items:center;flex-wrap:wrap;gap:8px;width:100%;margin:0;padding:10px 12px;background:#fbf7ee;border-radius:8px;font-size:12px}
+.unavailable-notice .ant-tag{margin:0}
+.teacher-cards>.panel>.card-action{align-self:flex-start;width:fit-content;max-width:100%;margin-top:8px}
+.ant-modal .ant-modal-footer{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:10px;margin-top:22px;padding-top:18px;border-top:1px solid #edf0e9}
+.ant-modal .ant-modal-footer>.ant-btn+.ant-btn{margin-inline-start:0}
+.ant-modal-footer .modal-actions{width:100%;padding-top:0;gap:10px;flex-wrap:wrap}
+.ant-modal-footer .ant-btn:not(.ant-btn-icon-only){min-width:80px}
+.ant-modal-body .session-detail~.actions{margin-top:18px}
+.request-card .ant-btn{font-size:12px;height:auto;padding:8px 12px}
+.task-row{gap:20px;padding-block:16px}
+.task-row>.ant-btn{font-size:12px;max-width:45%}
+.demo-player{flex-wrap:wrap}
+.demo-player>.ant-btn{flex:1 0 auto}
+@media(max-width:760px){
+  .panel-title>.actions{margin-left:0;justify-content:flex-start;width:100%}
+  .page-title>.actions{width:100%}
+  .teacher-card-actions .ant-btn:not(.ant-btn-icon-only){min-height:40px}
+  .ant-modal-footer .ant-btn:not(.ant-btn-icon-only){min-height:40px}
+  .task-row{gap:12px;flex-wrap:wrap}
+  .task-row>.ant-btn{max-width:100%}
+  .topbar .role-switch{row-gap:10px}
+}
+@media(prefers-reduced-motion:reduce){.ant-btn{transition:none}}
+
+.low-balance{color:#cf1322}
+
+/* Teacher profiles and the selected teacher's weekly calendar. */
+.teacher-section-heading,.teacher-calendar-heading,.teacher-calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.teacher-section-heading{margin-bottom:16px}.teacher-section-heading h2,.teacher-calendar h2{font-size:18px;margin:0}.teacher-section-heading>span{font-size:12px}
+.teacher-profiles{gap:18px}.teacher-profiles .teacher-profile{padding:0;overflow:hidden;min-width:0;transition:border-color .15s,box-shadow .15s}.teacher-profile.selected{border-color:#39836f;box-shadow:0 0 0 1px #39836f}
+.teacher-select{display:block;width:100%;border:0;background:transparent;text-align:left;padding:22px;color:inherit;cursor:pointer;font:inherit}.teacher-select:focus-visible{outline:2px solid #236b59;outline-offset:-4px}.teacher-select:hover{background:#f7faf7}.teacher-identity{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:22px}.teacher-select .tags{min-height:24px}.teacher-select p{font-size:12px;margin:10px 0 18px}.teacher-profile-bottom{display:flex;justify-content:space-between;gap:10px;font-size:12px}.teacher-profile-bottom b{color:#236b59}.teacher-profile-edit{margin:0 14px 12px;color:#73867b}
+.teacher-calendar-heading p{margin:8px 0 0;font-size:12px}.teacher-calendar-toolbar{padding:20px 0 16px;margin-top:18px;border-top:1px solid #edf0e9}.teacher-calendar-toolbar .ant-input{width:145px}.teacher-calendar-toolbar b{font-size:13px}.calendar-legend{display:flex;flex-wrap:wrap;gap:16px;font-size:11px;color:#73867b}.calendar-legend span{display:flex;align-items:center;gap:6px}.calendar-legend i{width:10px;height:10px;border-radius:3px}.available-key{background:#e4f1e8}.lesson-key{background:#b5d4eb}.done-key{background:#b8d7c3}.off-key{background:#f0d1a0}.calendar-empty{font-size:12px;background:#f6f8f3;padding:12px;border-radius:6px;color:#73867b}
+.teacher-calendar-scroll{overflow:auto;border:1px solid #e4eae3;border-radius:9px;max-height:730px}.teacher-week-grid{display:grid;grid-template-columns:64px repeat(7,minmax(132px,1fr));min-width:990px}.teacher-week-head{position:sticky;top:0;z-index:5;background:#fafbf8;border-bottom:1px solid #e4eae3;border-right:1px solid #edf0e9;min-height:65px;display:flex;align-items:center;justify-content:center;gap:5px;flex-direction:column;font-size:11px;color:#859287}.teacher-week-head b{font-size:15px;color:#344b42}.teacher-week-head.is-today{background:#eaf3ed;color:#236b59}.teacher-week-head small{font-size:9px}.teacher-hour-axis{position:relative;background:#fff}.teacher-hour-axis>span{position:absolute;left:12px;font-size:10px;color:#8b978b;padding-top:5px}.teacher-day-column{position:relative;border-left:1px solid #edf0e9;background:repeating-linear-gradient(to bottom,transparent 0,transparent 89px,#edf0e9 89px,#edf0e9 90px)}
+.teacher-available,.teacher-off,.teacher-calendar-lesson{position:absolute;border-radius:5px;overflow:auto;box-sizing:border-box}.teacher-available{left:3px;right:3px;background:#eaf3edb3;border:1px solid #d9e9dd;font-size:10px;color:#769a83;padding:4px}.teacher-off{left:3px;right:3px;background:#fcf1df;border:1px dashed #ddbb84;color:#a57939;padding:5px;font-size:10px}.teacher-off small{display:block}.teacher-calendar-lesson{left:7px;right:7px;z-index:2;display:flex;flex-direction:column;gap:3px;text-align:left;padding:7px;background:#edf5fc;border:1px solid #c5ddef;border-left:3px solid #6797bd;color:#345e7d;font-size:11px;cursor:pointer}.teacher-calendar-lesson:hover{filter:brightness(.97)}.teacher-calendar-lesson:focus-visible{outline:2px solid #236b59;z-index:3}.teacher-calendar-lesson.completed{background:#edf5ef;border-color:#b8d7c3;color:#47735a}.teacher-calendar-lesson strong{font-size:12px}.teacher-calendar-lesson small{margin-top:auto}.teacher-day-empty{margin:32px 8px;font-size:11px;color:#99a49c;text-align:center}.teacher-off-records{margin-top:22px}.teacher-off-records .unavailable-notice{margin-top:8px}
+@media(max-width:640px){.teacher-calendar-heading>.actions{width:100%}.teacher-calendar-toolbar>.actions{gap:8px}.teacher-calendar-toolbar b{order:4;width:100%}.teacher-select{padding:18px}.teacher-calendar{padding:16px}.teacher-section-heading{gap:8px}}
+
+.teacher-calendar-heading{justify-content:space-between}
+.teacher-calendar-legend{display:flex;justify-content:flex-end;padding:0 24px 12px;background:transparent}

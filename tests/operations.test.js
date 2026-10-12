@@ -19,3 +19,16 @@ test('proposal does not create lessons, revalidates on confirmation and is repea
 test('partial requests preserve omitted days for follow-up',()=>{const db=base(),r=db.requests[0];const out=commitSchedule(db,[draft({studentIds:['s2'],date:r.date})],{requestId:r.id,omittedDates:[dateAdd(r.date,1),dateAdd(r.date,2)]});assert.equal(out.requests.filter(r=>r.status==='pending').length,3);assert.equal(out.requests.find(x=>x.id===r.id).status,'accepted');});
 test('series change is atomic and preserves individual students and agreed prices',()=>{let db=base();db=commitSchedule(db,[draft(),draft({date:dateAdd(todayHK(),8)})]);const first=db.sessions.at(-2);const next={...first,start:'18:00',end:'19:00'};let changed=changeSeries(db,first,next);assert.equal(changed.sessions.filter(x=>x.batchId===first.batchId&&x.start==='18:00').length,2);assert.deepEqual(changed.sessions.at(-1).charges,db.sessions.at(-1).charges);const blocker={...db.sessions.at(-1),id:'blocker',start:'18:00',end:'19:00'};assert.throws(()=>changeSeries({...db,sessions:[...db.sessions,blocker]},first,next));assert.equal(db.sessions.at(-1).start,'17:00');});
 test('flexible time suggestion checks every resource and stays within requested range',()=>{const db=base();const b=suggestSlot(db,draft({date:todayHK()}),'14:00','18:00',60);assert.ok(b);assert.ok(b.start>='14:00'&&b.end<='18:00');assert.equal(suggestSlot(db,draft(),'15:00','15:30',60),null);});
+
+test('future lessons allow attendance and correction without duplicate deductions', () => {
+  let db = base();
+  db.sessions.find(s => s.id === 'b2').date = dateAdd(todayHK(), 7);
+  const balance = db.students.find(s => s.id === 's1').balance;
+  db = completeSession(db, 'b2', {s1: 'present', s6: 'leave'}, '提前確認');
+  assert.equal(db.students.find(s => s.id === 's1').balance, balance - 1);
+  assert.throws(() => completeSession(db, 'b2', {s1: 'present', s6: 'leave'}, ''), /不能重複/);
+  db = reverseAttendance(db, 'b2', '課前更正');
+  db = completeSession(db, 'b2', {s1: 'leave', s6: 'leave'}, '已請假');
+  assert.equal(db.students.find(s => s.id === 's1').balance, balance);
+  assert.equal(db.sessions.find(s => s.id === 'b2').attendance.s1, 'leave');
+});
