@@ -9,8 +9,8 @@ test('unconfirmed availability, subject and level rejected',()=>{const d=base();
 test('multi-day validation checks every day without mutating records',()=>{const d=base();const n=d.sessions.length;d.teachers[0].weekly=[];d.teachers[0].extra=[{date:d.sessions[0].date,start:'10:00',end:'20:00'}];assert.match(validateSessions(d,[draft(d),draft(d,{date:dateAdd(d.sessions[0].date,1)})]),/尚未確認/);assert.equal(d.sessions.length,n);});
 test('rescheduling excludes original; cancelled booking frees slot',()=>{const d=base(),b=d.sessions[0];assert.equal(validateSessions(d,[b],b.id),'');d.sessions[0].status='cancelled';assert.equal(validateSessions(d,[{...b,id:'copy',status:'scheduled'}]),'');});
 test('attendance consumes each present package student once, leaves absent unchanged',()=>{const d=base();const out=completeSession(d,'b2',{s1:'present',s6:'leave'},'練習完成');assert.equal(out.students.find(s=>s.id==='s1').balance,7);assert.equal(out.students.find(s=>s.id==='s6').balance,10);assert.equal(out.ledger.length,1);assert.throws(()=>completeSession(out,'b2',{s1:'present',s6:'present'},''),/重複/);assert.equal(d.students[0].balance,8);});
-test('insufficient credit records attendance and does not block classmates',()=>{const d=base();d.students[0].balance=0;const out=completeSession(d,'b2',{s1:'present',s6:'present'},'');assert.equal(out.sessions.find(b=>b.id==='b2').status,'completed');assert.equal(out.students.find(s=>s.id==='s6').balance,9);assert.equal(out.ledger.find(l=>l.studentId==='s1').type,'待補扣');assert.equal(out.students[0].balance,0);});
-test('pay-per-session completion creates billable entry without package deduction',()=>{const d=base(),out=completeSession(d,'b3',{s4:'present'},'');assert.equal(out.students.find(s=>s.id==='s4').balance,0);assert.equal(out.ledger[0].type,'按次待開單');});
+test('insufficient credit rejects attendance atomically',()=>{const d=base();d.students[0].balance=0;const before=structuredClone(d);assert.throws(()=>completeSession(d,'b2',{s1:'present',s6:'present'},''),/先購課/);assert.deepEqual(d,before);});
+test('pay-per-session completion is rejected',()=>{assert.throws(()=>completeSession(base(),'b3',{s4:'present'},''),/先購課/);});
 test('percentage discount applies to subtotal before surcharge',()=>{assert.deepEqual(totals([{quantity:2,unitPrice:320}],50,'percent',10),{subtotal:640,surcharge:50,discount:64,total:626});assert.equal(totals([{quantity:1,unitPrice:280}],10,'fixed',30).total,260);});
 
 test('attendance correction restores credit exactly once and retains audit trail',async()=>{
@@ -28,15 +28,5 @@ test('attendance correction restores credit exactly once and retains audit trail
  const fixedAgain=reverseAttendance(redone,'b2','重新確認');
  assert.equal(fixedAgain.students.find(s=>s.id==='s1').balance,8);
 });
-test('billed lessons block correction; reversed single lessons leave the billing queue',async()=>{
- const {reverseAttendance,billableLessons}=await import('../src/model.js');
- const done=completeSession(base(),'b3',{s4:'present'},'');
- assert.equal(billableLessons(done).length,1);
- const billed={...done,invoices:[{id:'inv',studentId:'s4',lines:[{sessionId:'b3'}]}]};
- assert.equal(billableLessons(billed).length,0);
- assert.throws(()=>reverseAttendance(billed,'b3','錯誤'),/已開單/);
- const fixed=reverseAttendance(done,'b3','未到課');
- assert.equal(billableLessons(fixed).length,0);
-});
-
+test('historical billed lessons remain protected',async()=>{const {reverseAttendance,billableLessons}=await import('../src/model.js');const done=base();done.sessions.find(s=>s.id==='b3').status='completed';done.invoices=[{id:'inv',studentId:'s4',lines:[{sessionId:'b3'}]}];assert.equal(billableLessons(done).length,0);assert.throws(()=>reverseAttendance(done,'b3','錯誤'),/已開單/);});
 test('flexible scheduling ignores legacy course capacity',()=>{const d=base();d.courses.find(c=>c.id==='c2').limit=2;assert.equal(validateSessions(d,[draft(d,{studentIds:['s1','s2','s3']})]),'');});

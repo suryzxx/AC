@@ -3,13 +3,12 @@ import Input from './SystemInput';
 import React, { useState, useRef } from 'react';
 import { Button, Modal, Select, Checkbox, Alert, Tag, Segmented, Empty } from 'antd';
 import { localizedElement } from './language';
-import { todayHK, dateAdd, studentName, teacherName, courseName, money, pendingDeductions, billableLessons, affectedLessons, markTeacherOff, leaveLesson, fixInvoice, settleCredits, confirmProposal } from './model';
+import { todayHK, dateAdd, studentName, teacherName, courseName, money, affectedLessons, markTeacherOff, leaveLesson, fixInvoice, confirmProposal } from './model';
 const titles = {
   teacherOff: '老師臨時不能上課',
   studentLeave: '學生請假 / 取消本次',
   invoiceFix: '更正單據',
-  proposal: '確認約課方案',
-  settle: '處理待補扣'
+  proposal: '確認約課方案'
 };
 export const operationTypes = Object.keys(titles);
 export function OperationsDialog({
@@ -51,8 +50,8 @@ export function OperationsDialog({
   const field = (label, child) => <label className="field"><span>{label}</span>{child}</label>;
   const affected = d.type === 'teacherOff' ? db.sessions.filter(b => b.teacherId === d.teacher.id && b.status === 'scheduled' && b.date === v.date && b.start < v.end && b.end > v.start) : [];
   const request = d.type === 'proposal' ? db.requests.find(r => r.id === d.request.id) : null;
-  const submit = () => apply(old => d.type === 'teacherOff' ? markTeacherOff(old, d.teacher.id, v) : d.type === 'studentLeave' ? leaveLesson(old, d.session.id, v.studentId, v.reason, v.makeup, role) : d.type === 'invoiceFix' ? fixInvoice(old, d.invoice.id, v.action, v.reason) : d.type === 'proposal' ? confirmProposal(old, d.request.id, true) : settleCredits(old, d.studentId));
-  return <Modal open width={650} title={titles[d.type]} onCancel={close} footer={<><Button onClick={close}>關閉</Button>{d.type === 'proposal' && <Button onClick={() => apply(old => confirmProposal(old, d.request.id, false))}>時間不合適，重新安排</Button>}<Button type="primary" htmlType="submit" form="operations-form">{d.type === 'proposal' ? role === 'admin' ? '已線下確認，安排課堂' : '同意方案並確認空檔' : d.type === 'settle' ? '用現有課時補扣' : '確認'}</Button></>}><form id="operations-form" ref={form} onSubmit={e => {
+  const submit = () => apply(old => d.type === 'teacherOff' ? markTeacherOff(old, d.teacher.id, v) : d.type === 'studentLeave' ? leaveLesson(old, d.session.id, v.studentId, v.reason, v.makeup, role) : d.type === 'invoiceFix' ? fixInvoice(old, d.invoice.id, v.action, v.reason) : confirmProposal(old, d.request.id, true));
+  return <Modal open width={650} title={titles[d.type]} onCancel={close} footer={<><Button onClick={close}>關閉</Button>{d.type === 'proposal' && <Button onClick={() => apply(old => confirmProposal(old, d.request.id, false))}>時間不合適，重新安排</Button>}<Button type="primary" htmlType="submit" form="operations-form">{d.type === 'proposal' ? role === 'admin' ? '已線下確認，安排課堂' : '同意方案並確認空檔' : '確認'}</Button></>}><form id="operations-form" ref={form} onSubmit={e => {
       e.preventDefault();
       submit();
     }}>
@@ -62,9 +61,8 @@ export function OperationsDialog({
           label: studentName(db, id)
         }))} />)}<Alert type="info" title="本原型請假不扣課；同堂其他學生維持原安排。" /><Checkbox checked={v.makeup} onChange={e => put('makeup', e.target.checked)}>需要另約，加入待安排事項（不額外贈送課時）</Checkbox></>}
     {['teacherOff', 'studentLeave', 'invoiceFix'].includes(d.type) && field('原因', <Input.TextArea required value={v.reason} onChange={e => put('reason', e.target.value)} placeholder="留下原因，方便之後追溯" />)}
-    {d.type === 'invoiceFix' && <><p>{d.invoice.no} · {money(d.invoice.total)}</p><Alert type="warning" title={d.invoice.paid ? '撤銷誤登收款，恢復待收款；課包會扣回相應餘額。這不是退款。' : '作廢後保留原單據，關聯按次課堂可重新開單。'} /><p>已使用的課包不能直接撤銷；真實退費及部分退款仍需另行結算。</p></>}
+    {d.type === 'invoiceFix' && <><p>{d.invoice.no} · {money(d.invoice.total)}</p><Alert type="warning" title={d.invoice.paid ? '撤銷誤登收款，恢復待收款；課包會扣回相應餘額。這不是退款。' : '作廢後保留原單據，不增加購買課時。'} /><p>已使用的課包不能直接撤銷；真實退費及部分退款仍需另行結算。</p></>}
     {d.type === 'proposal' && <><Alert type="info" title="方案尚未佔用時段，確認時會再次檢查老師與學生空檔。" />{request?.proposal?.map(b => <p key={b.id}>{b.date} {b.start}–{b.end} · {teacherName(db, b.teacherId)}</p>)}{!!request?.remainingDates?.length && <p>尚待安排：{request.remainingDates.join('、')}</p>}</>}
-    {d.type === 'settle' && <><p>{studentName(db, d.studentId)} · 現有 {db.students.find(s => s.id === d.studentId)?.balance} 堂</p>{pendingDeductions(db).filter(l => l.studentId === d.studentId).map(l => <p key={l.id}>{l.date} · {l.note} · 待補扣 1 堂</p>)}<Alert type="info" title="按上課日期由早至晚補扣，最多扣到餘額為零。續購並收款後也會自動補扣。" /></>}
     {error && <Alert type="error" showIcon title={error} />}</form></Modal>;
 }
 export function WorkQueue({
@@ -83,41 +81,15 @@ export function WorkQueue({
       type: 'schedule',
       session: b
     }
-  })), ...pendingDeductions(db).map(l => ({
-    id: l.id,
-    group: 'exception',
-    label: `${studentName(db, l.studentId)} · ${l.date} 待補扣`,
-    hint: '出勤已記錄，尚欠 1 堂課時',
-    action: db.students.find(s => s.id === l.studentId)?.balance > 0 ? '補扣' : '續購處理',
-    dialog: db.students.find(s => s.id === l.studentId)?.balance > 0 ? {
-      type: 'settle',
-      studentId: l.studentId
-    } : {
-      type: 'bill',
-      studentId: l.studentId,
-      source: 'package'
-    }
   })), ...db.sessions.filter(b => b.status === 'scheduled' && b.date <= todayHK()).map(b => ({
     id: 'attendance' + b.id,
     group: 'attendance',
     label: `${b.date} ${b.start} · ${courseName(db, b.courseId)}`,
-    hint: b.date < todayHK() ? '已過上課日期，仍未點名' : '今日待點名',
-    action: '記錄出勤',
+    hint: b.pendingConsumption ? '出勤已記錄，待老師確認課銷' : b.date < todayHK() ? '已過上課日期，仍未點名' : '今日待點名',
+    action: b.pendingConsumption ? '確認課銷' : '記錄出勤',
     dialog: {
       type: 'attendance',
       session: b
-    }
-  })), ...billableLessons(db).map(l => ({
-    id: 'bill' + l.id,
-    group: 'money',
-    label: `${studentName(db, l.studentId)} · ${l.date} 課堂待開單`,
-    hint: '已到課，尚未開立帳單',
-    action: '開單',
-    dialog: {
-      type: 'bill',
-      source: 'lesson',
-      studentId: l.studentId,
-      sessionIds: [l.sessionId]
     }
   })), ...db.invoices.filter(i => !i.paid && !i.voided).map(i => ({
     id: i.id,

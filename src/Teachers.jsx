@@ -23,7 +23,7 @@ export default function Teachers({ db, isAdmin, teacherId, setDialog, update, re
   const position = w => ({ top: (mins(w.start) - start) * 1.5, height: (mins(w.end) - mins(w.start)) * 1.5 });
   const edit = (type, t = teacher) => setDialog({ type, teacher: t });
   return <>
-    <PageHeading><div><h1>{isAdmin ? '老師與可用時間' : '我的可用時間'}</h1><p>查看老師基本資料，選擇老師查看每週排課與可授課時段。</p></div>{isAdmin && <Button type="primary" icon={<PlusOutlined />} onClick={() => setDialog({ type: 'teacher' })}>新增老師</Button>}</PageHeading>
+    <PageHeading><div><h1>{isAdmin ? '老師與可用時間' : '我的可用時間'}</h1></div>{isAdmin && <Button type="primary" icon={<PlusOutlined />} onClick={() => setDialog({ type: 'teacher' })}>新增老師</Button>}</PageHeading>
     <div className="native-teacher-workspace">
     <aside className="native-teacher-master"><div className="native-master-header"><b>老師</b><span>{teachers.length}</span></div><div className="native-master-search"><Input prefix={<SearchOutlined />} aria-label="搜尋老師" placeholder="搜尋老師" value={query} onChange={e => setQuery(e.target.value)} allowClear /></div><div className="native-master-items">{teachers.filter(t => simplify(t.name+t.english).toLowerCase().includes(simplify(query).toLowerCase())).map(t => <button key={t.id} aria-pressed={teacher?.id === t.id} className={teacher?.id === t.id ? 'selected' : ''} onClick={() => setSelectedId(t.id)}><TeacherAvatar teacher={t} /><span><b>{t.name}</b><small>{t.english} · {t.type === 'full' ? '全職' : '兼職'}</small></span></button>)}</div><div className="native-master-foot">選擇老師查看課表</div></aside>
     <div className="native-teacher-detail">

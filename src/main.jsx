@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App as AntApp, ConfigProvider, Button, InputNumber, Select, Tag, Modal, Empty, Segmented, Alert, Checkbox, Popconfirm } from 'antd';
 import { CalendarOutlined, TeamOutlined, BookOutlined, FileTextOutlined, ClockCircleOutlined, PlusOutlined, ArrowLeftOutlined, ArrowRightOutlined, CheckOutlined, SearchOutlined, AppstoreOutlined, SwapOutlined, CloseOutlined, PrinterOutlined } from '@ant-design/icons';
-import { saveSessionAttendance, addSessionStudents, upgradeDemoCalendar, upgradeDemoAvatars, upgradeDemoCourses, totalStudentLessons, usePurchasedLessonCredits, addStudentWithLessons, seed, upgradeDemoStudents, uid, dateAdd, todayHK, mins, money, availability, validateSessions, completeSession, totals, courseName, studentName, teacherName, billableLessons, reverseAttendance, normalizeDb, lessonCharge, pendingDeductions, registerPayment, settleCredits, commitSchedule, changeSeries, seriesDrafts, suggestSlot } from './model';
+import { upgradeDemoBilling, reconcileDemoBookingCredits, hasConfirmedConsumption, confirmStudentConsumption, markStudentAbsent, upgradeDemoTeacherVariety, confirmSessionConsumption, saveSessionAttendance, addSessionStudents, upgradeDemoCalendar, upgradeDemoAvatars, upgradeDemoCourses, totalStudentLessons, usePurchasedLessonCredits, addStudentWithLessons, seed, upgradeDemoStudents, uid, dateAdd, todayHK, mins, money, availability, validateSessions, completeSession, totals, courseName, studentName, teacherName, billableLessons, reverseAttendance, normalizeDb, lessonCharge, pendingDeductions, registerPayment, settleCredits, commitSchedule, changeSeries, seriesDrafts, suggestSlot } from './model';
 import 'antd/dist/reset.css';
 import './style.css';
 import './mac-theme.css';
@@ -13,17 +13,20 @@ import './glass-layout.css';
 import './dialog-theme.css';
 import { NativeLayoutContext, PageHeading, NativeSidebar, NativeToolbar, NativeRecordTable } from './NativeUI';
 import { macTheme } from './themes';
-import { OperationsDialog, operationTypes, WorkQueue, WeekView } from './Operations';
+import { OperationsDialog, operationTypes, WeekView } from './Operations';
 import Teachers from './Teachers';
 import Dashboard from './Dashboard';
 import TeacherAvatarEditor, { TeacherAvatar } from './TeacherAvatar';
 import StudentRecords from './StudentRecords.jsx';
+import TeachingResources from './TeachingResources.jsx';
+import ExamPapers from './ExamPapers.jsx';
 import zhCN from 'antd/locale/zh_CN';
 import zhHK from 'antd/locale/zh_HK';
 import { localizedElement, t, simplify, LANGUAGE_KEY, setDisplayLanguage } from './language';
 const STORE = 'ac-flex-demo-v3';
 const statusNames = {
   scheduled: '已安排',
+  pendingConsumption: '待老師確認課銷',
   completed: '已完成',
   cancelled: '已取消',
   pending: '待安排',
@@ -70,14 +73,14 @@ function Demo({
   const [savedDb, setSavedDb] = useState(() => {
     try {
       const v = JSON.parse(localStorage.getItem(STORE));
-      return upgradeDemoCalendar(usePurchasedLessonCredits(normalizeDb(upgradeDemoAvatars(upgradeDemoCourses(v?.version === 3 ? upgradeDemoStudents(v) : seed())))));
+      return upgradeDemoBilling(reconcileDemoBookingCredits(upgradeDemoTeacherVariety(upgradeDemoCalendar(usePurchasedLessonCredits(normalizeDb(upgradeDemoAvatars(upgradeDemoCourses(v?.version === 3 ? upgradeDemoStudents(v) : seed()))))))));
     } catch {
-      return upgradeDemoCalendar(usePurchasedLessonCredits(normalizeDb(upgradeDemoAvatars(upgradeDemoCourses(seed())))));
+      return upgradeDemoBilling(reconcileDemoBookingCredits(upgradeDemoTeacherVariety(upgradeDemoCalendar(usePurchasedLessonCredits(normalizeDb(upgradeDemoAvatars(upgradeDemoCourses(seed()))))))));
     }
   });
   const role = 'admin';
   const teacherId = 't1';
-  const [page, setPage] = useState('home'),
+  const [page, setPage] = useState('schedule'),
     [date, setDate] = useState(todayHK()),
     [filter, setFilter] = useState('all'),
     [search, setSearch] = useState(''),
@@ -90,7 +93,9 @@ function Demo({
   }, [page]);
   const [scheduleView, setScheduleView] = useState('day');
   const [studentFilter, setStudentFilter] = useState('all');
-  const [attendanceFilter, setAttendanceFilter] = useState('pending');
+  const [attendanceFilter, setAttendanceFilter] = useState('all');
+  const [billingFilter, setBillingFilter] = useState('pending');
+  const [billingSearch, setBillingSearch] = useState('');
   const db = savedDb;
   const setDb = setSavedDb;
   useEffect(() => {
@@ -112,7 +117,11 @@ function Demo({
   const visibleSessions = db.sessions;
   const visibleStudents = db.students;
   const current = visibleSessions.filter(b => b.date === date && b.status !== 'cancelled');
-  const visibleInvoices = db.invoices;
+  const billingQuery = simplify(billingSearch.trim()).toLowerCase();
+  const visibleInvoices = db.invoices.filter(i => billingFilter === 'all' || (billingFilter === 'pending' ? !i.paid && !i.voided : billingFilter === 'paid' ? i.paid && !i.voided : false)).filter(i => {
+    const student = db.students.find(s => s.id === i.studentId);
+    return !billingQuery || simplify(`${student?.name || ''} ${student?.english || ''}`).toLowerCase().includes(billingQuery);
+  });
   const update = (fn, text) => {
     setDb(old => fn(old));
     if (text) message.success(text);
@@ -128,12 +137,8 @@ function Demo({
     session
   });
   const menu = [{ key: 'dashboard', label: '數據面板', icon: <AppstoreOutlined /> }, {
-    key: 'home',
-    label: isAdmin ? '今日工作台' : role === 'teacher' ? '我的工作台' : '孩子的學習',
-    icon: <AppstoreOutlined />
-  }, {
     key: 'schedule',
-    label: isAdmin ? '靈活排課' : '課堂安排',
+    label: isAdmin ? '課表' : '課堂安排',
     icon: <CalendarOutlined />
   }, ...(role !== 'parent' ? [{
     key: 'teachers',
@@ -149,17 +154,17 @@ function Demo({
     icon: <BookOutlined />
   }, ...(role !== 'parent' ? [{
     key: 'attendance',
-    label: '考勤與課消',
+    label: '出勤與課銷',
     icon: <CheckOutlined />
   }] : []), ...(role !== 'teacher' ? [{
     key: 'billing',
     label: isAdmin ? '帳單與收款' : '我的單據',
     icon: <FileTextOutlined />
   }] : [])];
+  menu.push(...[{ key: 'audio', label: '音頻' }, { key: 'video', label: '視頻' }, { key: 'questions', label: '試題' }, { key: 'papers', label: '試卷' }]);
   const nav = k => {
     setPage(k);
     setSearch('');
-    if (k === 'home') setDate(todayHK());
     if (k === 'students') setStudentFilter('all');
   };
   const table = (rows, cols, props = {}) => <NativeRecordTable key={props.key || page} rows={rows} cols={cols} tableProps={props} />;
@@ -174,7 +179,7 @@ function Demo({
     render: (_, b) => teacherName(db, b.teacherId)
   }, {
     title: '狀態',
-    render: (_, b) => <Status value={b.status} />
+    render: (_, b) => <Status value={b.pendingConsumption ? 'pendingConsumption' : b.status} />
   }, {
     title: '操作',
     render: (_, b) => <Button size="small" onClick={() => setDialog({
@@ -201,13 +206,10 @@ function Demo({
             })}><div><b>{b.start}–{b.end}</b></div><strong>{courseName(db, b.courseId)}</strong><p>{b.studentIds.filter(s => role !== 'parent' || s === parentId).map(s => studentName(db, s)).join('、')}{b.status === 'completed' ? ' ✓' : ''}</p></button>)}{!availability(t, date).length && <div className="no-availability">未確認可用時間<br /><small>先與老師確認，再安排課堂</small></div>}</div></div>)}</div></div>;
   }
   let body;
+  if (page === 'papers') body = <ExamPapers />;
+  if (['audio', 'video', 'questions'].includes(page)) body = <TeachingResources key={page} type={page} />;
   if (page === 'dashboard') body = <Dashboard db={db} />;
-  if (page === 'home') body = <>
-    <PageHeading><div><h1>今日工作台</h1><p>{dateLabel(todayHK())} · 超級管理員</p></div><Button icon={<PlusOutlined />} onClick={() => openSchedule()}>安排課堂</Button></PageHeading>
-    <div className="native-overview">{(isAdmin ? [[current.length,'今日課堂','schedule'],[visibleSessions.filter(b => b.status === 'scheduled' && b.date <= todayHK()).length,'待記錄課堂','attendance'],[db.students.filter(s => s.mode === 'package' && s.balance <= 2).length,'課時即將用完','students']] : role === 'teacher' ? [[current.length,'今日課堂','schedule'],[visibleStudents.length,'相關學生','students'],[visibleSessions.filter(b => b.status === 'scheduled' && b.date <= todayHK()).length,'待記錄課堂','attendance']] : [[db.students.find(s => s.id === parentId)?.balance || 0,'剩餘課時','students'],[visibleSessions.filter(b => b.status === 'scheduled').length,'已安排課堂','schedule'],[visibleSessions.filter(b => b.status === 'completed').length,'已完成課堂','attendance']]).map(([count,label,target]) => <button key={label} onClick={() => {nav(target); if (target === 'students' && isAdmin) setStudentFilter('low');}}><span>{label}</span><b>{count}</b><ArrowRightOutlined /></button>)}</div>
-    <div className="native-home-workspace"><section className="native-agenda"><div className="native-section-bar"><h2>今日課堂</h2><Button size="small" type="text" onClick={() => nav('schedule')}>打開日曆 <ArrowRightOutlined /></Button></div>{current.length ? current.map(b => <button className="native-agenda-row" key={b.id} onClick={() => setDialog({type:'session',session:b})}><time>{b.start}<small>{b.end}</small></time><span><b>{courseName(db,b.courseId)}</b><small>{teacherName(db,b.teacherId)}</small></span><Status value={b.status} /><ArrowRightOutlined /></button>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="今天沒有已安排的課堂" />}<div className="native-agenda-foot">香港時間 · {todayHK()}</div></section>{isAdmin ? <WorkQueue db={db} setDialog={setDialog} onStudents={() => {nav('students');setStudentFilter('low');}} /> : <section className="native-upcoming"><div className="native-section-bar"><h2>課堂記錄</h2></div>{table(visibleSessions.filter(b => b.status !== 'cancelled'),sessionCols)}</section>}</div>
-  </>;
-  if (page === 'schedule') body = <><PageHeading><div><h1>{isAdmin ? '靈活排課' : '課堂安排'}</h1><p>先確認老師可用時間，再安排學生；自動檢查老師和學生衝突。</p></div>{isAdmin && <Button type="primary" icon={<PlusOutlined />} onClick={() => openSchedule()}>安排課堂</Button>}</PageHeading><Panel title={dateLabel(date)} extra={<div className="actions"><Segmented value={scheduleView} onChange={setScheduleView} options={[{
+  if (page === 'schedule') body = <><PageHeading><div><h1>{isAdmin ? '課表' : '課堂安排'}</h1></div>{isAdmin && <Button type="primary" icon={<PlusOutlined />} onClick={() => openSchedule()}>安排課堂</Button>}</PageHeading><Panel title={dateLabel(date)} extra={<div className="actions"><Segmented value={scheduleView} onChange={setScheduleView} options={[{
         value: "day",
         label: "日"
       }, {
@@ -228,7 +230,7 @@ function Demo({
         setScheduleView('day');
       }} /> : role === 'parent' ? table(current, sessionCols) : <><div className="board-note"><span className="dot green" /> 可授課空檔 <span className="dot blue" /> 已安排課堂</div>{scheduleBoard()}</>}</Panel><Panel title="課堂記錄" className="section">{table([...visibleSessions].sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start)), sessionCols)}</Panel></>;
   if (page === 'teachers') body = <Teachers db={db} isAdmin={isAdmin} teacherId={teacherId} setDialog={setDialog} update={update} record={record} />;
-  if (page === 'students') body = <><PageHeading><div><h1>{role === 'parent' ? '孩子與課時' : '學生與課時'}</h1><p>管理年級、家長聯絡、課時餘額與每次扣課記錄。</p></div>{isAdmin && <Button type="primary" icon={<PlusOutlined />} onClick={() => setDialog({
+  if (page === 'students') body = <><PageHeading><div><h1>{role === 'parent' ? '孩子與課時' : '學生與課時'}</h1></div>{isAdmin && <Button type="primary" icon={<PlusOutlined />} onClick={() => setDialog({
         type: 'student'
       })}>新增學生</Button>}</PageHeading><Panel title="學生名單" extra={<div className="actions"><Segmented value={studentFilter} onChange={setStudentFilter} options={[{
         value: "all",
@@ -248,11 +250,15 @@ function Demo({
         title: '年級',
         dataIndex: 'grade'
       }, {
-        title: '總課時',
-        render: (_, s) => <b>{totalStudentLessons(db, s.id)} 堂</b>
-      }, {
-        title: '剩餘課時',
-        render: (_, s) => <b className={s.balance <= 2 ? 'low-balance' : ''}>{s.balance} 堂</b>
+        title: '課時餘額',
+        render: (_, s) => {
+          const total = totalStudentLessons(db, s.id);
+          const percent = total > 0 ? Math.max(0, Math.min(100, s.balance / total * 100)) : 0;
+          return <div className={`student-credit-progress${s.balance <= 2 ? ' is-low' : ''}`}>
+            <div className="student-credit-label"><b>剩餘 {s.balance} 堂</b><span>共 {total} 堂</span></div>
+            <div className="student-credit-track" role="progressbar" aria-label={t(`${s.name}剩餘課時`)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)} aria-valuetext={t(`剩餘 ${s.balance} 堂，共 ${total} 堂`)}><div style={{width:`${percent}%`}} /></div>
+          </div>;
+        }
       }, {
         title: '操作',
         render: (_, s) => <div className="actions"><Button size="small" onClick={() => setDialog({
@@ -272,77 +278,34 @@ function Demo({
           showTotal: total => t(`共 ${total} 位學生`)
         }
       })}</Panel></>;
-  if (page === 'courses') body = <><PageHeading><div><h1>課程與收費</h1><p>課程是可約的教學內容，每次課堂可安排不同學生和老師。</p></div>{isAdmin && <Button type="primary" icon={<PlusOutlined />} onClick={() => setDialog({
+  if (page === 'courses') body = <><PageHeading><div><h1>課程與收費</h1></div>{isAdmin && <Button type="primary" icon={<PlusOutlined />} onClick={() => setDialog({
         type: 'course'
       })}>新增課程</Button>}</PageHeading><div className="teacher-cards">{db.courses.map(c => <Panel key={c.id} title={c.name}><p className="muted">{c.description}</p><div className="course-price">{money(c.price)} <small>/ 人 / 堂</small></div><p className="muted">可授課 · {db.teachers.filter(t => t.subjects.includes(c.id)).map(t => t.name).join('、') || '待設定老師'}</p>{isAdmin ? <Button className="card-action button-soft" onClick={() => setDialog({
           type: 'course',
           course: c
         })}>編輯課程與單價</Button> : null}</Panel>)}</div></>;
-  if (page === 'attendance') body = <><PageHeading><div><h1>考勤與課消</h1><p>按學生記錄出勤，一次確認完成課堂，課時記錄同步更新。</p></div></PageHeading><Alert showIcon type="info" title="出席 / 遲到扣 1 節，請假 / 缺席不扣課。剩餘課時不足會記為待補扣，購買課時並登記收款後自動補扣。" /><Panel title="課堂考勤" className="section" extra={<Segmented value={attendanceFilter} onChange={setAttendanceFilter} options={[{
-      value: 'pending',
-      label: '待記錄'
-    }, {
-      value: 'completed',
-      label: '已完成'
-    }, {
-      value: 'all',
-      label: '全部課堂'
-    }]} />}>{table(visibleSessions.filter(b => b.status !== 'cancelled' && (attendanceFilter === 'all' || (attendanceFilter === 'pending' ? b.status === 'scheduled' : b.status === 'completed'))), [{
-        title: '課堂',
-        render: (_, b) => <><b>{b.date} · {b.start}–{b.end}</b><small>{courseName(db, b.courseId)} · {teacherName(db, b.teacherId)}</small></>
-      }, {
-        title: '學生',
-        render: (_, b) => b.studentIds.filter(s => role !== 'parent' || s === parentId).map(s => studentName(db, s)).join('、')
-      }, {
-        title: '狀態',
-        render: (_, b) => <Status value={b.status} />
-      }, {
-        title: '操作',
-        render: (_, b) => <Button type={b.status === 'scheduled' ? 'primary' : 'default'} onClick={() => setDialog({
-          type: b.status === 'completed' ? 'session' : 'attendance',
-          session: b
-        })}>{b.status === 'completed' ? '查看課消' : '記錄與確認'}</Button>
-      }])}</Panel><Panel title="課時流水" className="section">{table(db.ledger.filter(l => visibleStudents.some(s => s.id === l.studentId)), [{
-        title: '日期',
-        dataIndex: 'date'
-      }, {
-        title: '學生',
-        render: (_, l) => studentName(db, l.studentId)
-      }, {
-        title: '類型',
-        render: (_, l) => <>{l.type}{l.reversed && <Tag>已沖回</Tag>}{l.settled && <Tag>已補扣</Tag>}</>
-      }, {
-        title: '變動',
-        render: (_, l) => <b>{l.delta > 0 ? '+' : ''}{l.delta} 堂</b>
-      }, {
-        title: '說明',
-        dataIndex: 'note'
-      }])}</Panel></>;
-  if (page === 'billing') body = <><PageHeading><div><h1>{isAdmin ? '帳單與收款' : '我的單據'}</h1><p>選擇收費項目，再確認是否收到款項；系統產生相應帳單與收據。</p></div>{isAdmin && <Button type="primary" icon={<PlusOutlined />} onClick={() => setDialog({
+  if (page === 'attendance') body = <><PageHeading><div><h1>出勤與課銷</h1></div></PageHeading><Panel title="已出勤學生" extra={<Segmented value={attendanceFilter} onChange={setAttendanceFilter} options={[{value:'all',label:'全部出勤'},{value:'pending',label:'待確認課銷'},{value:'completed',label:'已確認課銷'}]} />}>{table(visibleSessions.filter(b=>b.status !== 'cancelled').flatMap(b=>b.studentIds.filter(id=>['present','late'].includes(b.attendance?.[id])).map(studentId=>({id:`${b.id}:${studentId}`,session:b,studentId,confirmed:hasConfirmedConsumption(db,b.id,studentId)}))).filter(r=>attendanceFilter==='all'||(attendanceFilter==='completed'?r.confirmed:!r.confirmed)),[
+      {title:'學生',render:(_,r)=><><b>{studentName(db,r.studentId)}</b><small>{db.students.find(s=>s.id===r.studentId)?.english}</small></>},
+      {title:'課堂',render:(_,r)=><><b>{r.session.date} · {r.session.start}–{r.session.end}</b><small>{courseName(db,r.session.courseId)}</small></>},
+      {title:'老師',render:(_,r)=>teacherName(db,r.session.teacherId)},
+      {title:'課銷狀態',render:(_,r)=><Tag color={r.confirmed?'green':'gold'}>{r.confirmed?'已確認課銷':'待確認課銷'}</Tag>},
+      {title:'操作',render:(_,r)=><div className="actions">{!r.confirmed&&<Button type="primary" onClick={()=>{try{setDb(confirmStudentConsumption(db,r.session.id,r.studentId,r.session.teacherId));message.success('已確認課銷');}catch(e){rawMessage.error(t(e.message));}}}>確認課銷</Button>}<Popconfirm title="改為缺勤？已扣課時會退回，並取消此學生本堂課銷。" onConfirm={()=>{try{setDb(markStudentAbsent(db,r.session.id,r.studentId));message.success('已改為缺勤並取消課銷');}catch(e){rawMessage.error(t(e.message));}}}><Button>改為缺勤（取消課銷）</Button></Popconfirm></div>}
+    ])}</Panel></>;
+  if (page === 'billing') body = <><PageHeading><div><h1>{isAdmin ? '帳單與收款' : '我的單據'}</h1></div>{isAdmin && <Button type="primary" icon={<PlusOutlined />} onClick={() => setDialog({
         type: 'bill'
-      })}>開立單據</Button>}</PageHeading>{isAdmin && billableLessons(db).length > 0 && <div className="billing-callout"><FileTextOutlined /><div><b>{billableLessons(db).length} 堂歷史課堂待開單</b><p>從已到課記錄帶入課堂日期、時段和收費，避免遺漏。</p></div><Button onClick={() => setDialog({
-        type: 'bill',
-        source: 'lesson'
-      })}>從課堂開單</Button></div>}{isAdmin && billableLessons(db).length > 0 && <Panel title="待開單課堂" className="section">{table(billableLessons(db), [{
-        title: '學生',
-        render: (_, l) => studentName(db, l.studentId)
-      }, {
-        title: '已完成課堂',
-        render: (_, l) => `${l.date} ${l.start} · ${courseName(db, l.courseId)}`
-      }, {
-        title: '操作',
-        render: (_, l) => <Button type="primary" size="small" onClick={() => setDialog({
-          type: 'bill',
-          source: 'lesson',
-          studentId: l.studentId,
-          sessionIds: [l.sessionId]
-        })}>為這堂課開單</Button>
-      }])}</Panel>}<Panel title="單據記錄" className="section">{table(visibleInvoices, [{
+      })}>購課 / 續費</Button>}</PageHeading><div className="billing-filters"><Segmented value={billingFilter} onChange={setBillingFilter} options={[
+        {value:'pending',label:`待收款 (${db.invoices.filter(i => !i.paid && !i.voided).length})`},
+        {value:'paid',label:'已收款'},
+        {value:'all',label:'全部記錄'}
+      ]} /><Input className="billing-student-search" prefix={<SearchOutlined />} placeholder="搜尋學生中英文名" aria-label="搜尋帳單學生" allowClear value={billingSearch} onChange={e=>setBillingSearch(e.target.value)} /></div><Panel title={billingFilter === 'pending' ? '待收款帳單' : billingFilter === 'paid' ? '已收款記錄' : '全部單據'} className="section">{table(visibleInvoices, [{
         title: '單據編號',
-        render: (_, i) => <><b>{i.no}</b><small>{i.kind === 'both' ? 'Invoice + Receipt' : i.kind === 'invoice' ? 'Invoice' : 'Receipt'} · {i.date}</small></>
+        render: (_, i) => <><b>{i.no}</b><small>{i.paid ? '收據已開立' : '帳單'} · {i.date}</small></>
       }, {
         title: '學生',
         render: (_, i) => studentName(db, i.studentId)
+      }, {
+        title: '收費項目',
+        render: (_, i) => <b>{i.lines.map(l => l.description).join('、')}</b>
       }, {
         title: '金額',
         render: (_, i) => <b>{money(i.total)}</b>
@@ -361,16 +324,8 @@ function Demo({
             type: 'invoiceFix',
             invoice: i
           })}>{i.paid ? '撤銷誤收款' : '作廢帳單'}</Button>}</div>
-      }])}</Panel></>;
-  return <NativeLayoutContext.Provider value={{host:toolbarHost}}><div data-page={page} className="app native-app"><NativeSidebar menu={menu} page={page} nav={nav} roleLabel="超級管理員" /><main><NativeToolbar setHost={setToolbarHost} preferences={<><Select className="language-select" data-language-names="true" aria-label="简繁切换" value={language} onChange={onLanguageChange} options={[{
-            value: 'zh-CN',
-            label: '简体中文'
-          }, {
-            value: 'zh-HK',
-            label: '繁體中文'
-          }]} style={{
-            width: 115
-          }} /></>} /><div className="content" ref={contentRef}>{storageError && <Alert type="warning" title="瀏覽器儲存空間不足，本次變更暫未保存；請勿重新整理。" />}{body}<footer>AC Education · 少一點行政，多一點教學 <span>香港時間 · HKD</span></footer></div></main>{dialog && (operationTypes.includes(dialog.type) ? <OperationsDialog key={dialog.type + (dialog.studentId || dialog.invoice?.id || dialog.request?.id || dialog.session?.id || '')} dialog={dialog} db={db} setDb={setDb} close={() => setDialog(null)} role={role} message={message} /> : <Dialogs key={dialog.type + (dialog.session?.id || dialog.teacher?.id || '')} dialog={dialog} close={() => setDialog(null)} db={db} setDb={setDb} setDialog={setDialog} role={role} teacherId={teacherId} parentId={parentId} date={date} setDate={setDate} nav={nav} message={message} record={record} />)}</div></NativeLayoutContext.Provider>;
+      }], {key:`billing-${billingFilter}-${billingQuery}-${visibleInvoices.length}`, inspectorTitle:'學生', pagination:{pageSize:6,showSizeChanger:false,hideOnSinglePage:true}, onChange:()=>contentRef.current?.scrollTo({top:0,left:0})})}</Panel></>;
+  return <NativeLayoutContext.Provider value={{host:toolbarHost}}><div data-page={page} className="app native-app"><NativeSidebar menu={menu} page={page} nav={nav} roleLabel="超級管理員" /><main><NativeToolbar setHost={setToolbarHost} language={language} onLanguageChange={onLanguageChange} /><div className="content" ref={contentRef}>{storageError && <Alert type="warning" title="瀏覽器儲存空間不足，本次變更暫未保存；請勿重新整理。" />}{body}<footer>AC Education · 少一點行政，多一點教學 <span>香港時間 · HKD</span></footer></div></main>{dialog && (operationTypes.includes(dialog.type) ? <OperationsDialog key={dialog.type + (dialog.studentId || dialog.invoice?.id || dialog.request?.id || dialog.session?.id || '')} dialog={dialog} db={db} setDb={setDb} close={() => setDialog(null)} role={role} message={message} /> : <Dialogs key={dialog.type + (dialog.session?.id || dialog.teacher?.id || '')} dialog={dialog} close={() => setDialog(null)} db={db} setDb={setDb} setDialog={setDialog} role={role} teacherId={teacherId} parentId={parentId} date={date} setDate={setDate} nav={nav} message={message} record={record} />)}</div></NativeLayoutContext.Provider>;
 }
 function Dialogs({
   dialog: d,
@@ -411,10 +366,6 @@ function Dialogs({
         confirmation: 'confirmed'
       };
     }
-    if (d.type === 'attendance') return {
-      attendance: Object.fromEntries(d.session.studentIds.map(id => [id, 'present'])),
-      note: d.session.note || ''
-    };
     if (d.type === 'availability') return {
       weekly: structuredClone(d.teacher.weekly),
       extra: structuredClone(d.teacher.extra)
@@ -615,7 +566,7 @@ function Dialogs({
               label: `${t.name} · ${reason ? reason.split('：').slice(1).join('：') : '可安排'}`,
               disabled: !!reason
             };
-          })} /></div>)}</div><Alert className="schedule-conflict-alert" showIcon type={conflict ? 'warning' : 'success'} title={conflict || `本次 ${checkingDrafts.length} 堂，老師與學生均無衝突`} />{v.studentIds.some(id => db.students.find(s => s.id === id)?.mode === 'package' && db.students.find(s => s.id === id)?.balance < drafts.length) && <p className="warning-text">部分學生課時不足以覆蓋這次安排，請在上課前續購；此處不預扣課時。</p>}{v.skipped.length > 0 && <Alert type="warning" title={d.request ? `餘下 ${v.skipped.length} 天會繼續保留為待安排需求` : `本次只建立選中的 ${activeDrafts.length} 堂，未選日期不建立課堂`} />} {changedRequest && <Field label="與原需求不同，如何確認"><Select value={confirmation} onChange={x => put('confirmation', x)} options={[{
+          })} /></div>)}</div><Alert className="schedule-conflict-alert" showIcon type={conflict ? 'warning' : 'success'} title={conflict || `本次 ${checkingDrafts.length} 堂，老師與學生均無衝突`} />{v.studentIds.some(id => db.students.find(s => s.id === id)?.mode === 'package' && db.students.find(s => s.id === id)?.balance < drafts.length) && <p className="warning-text">部分學生可用課時不足，請先購課再預約。</p>}{v.skipped.length > 0 && <Alert type="warning" title={d.request ? `餘下 ${v.skipped.length} 天會繼續保留為待安排需求` : `本次只建立選中的 ${activeDrafts.length} 堂，未選日期不建立課堂`} />} {changedRequest && <Field label="與原需求不同，如何確認"><Select value={confirmation} onChange={x => put('confirmation', x)} options={[{
           value: 'propose',
           label: '發給家長確認（暫不佔用時段）'
         }, {
@@ -623,70 +574,37 @@ function Dialogs({
           label: '已電話 / 線下確認，直接安排'
         }]} /></Field>}<Field label="安排備註"><Input.TextArea rows={2} value={v.note} onChange={e => put('note', e.target.value)} /></Field></>, submit, original ? '確認調課' : '確認安排', 760);
   }
-  if (d.type === 'session') {
+  if (d.type === 'session' || d.type === 'attendance') {
     const b = db.sessions.find(b => b.id === d.session.id);
     const locked = b.status === 'cancelled' || db.invoices.some(invoice => !invoice.voided && invoice.lines.some(line => line.sessionId === b.id));
-    const attendanceValues = Object.fromEntries(b.studentIds.map(id => [id, v.attendance?.[id] ?? b.attendance?.[id]]));
-    const changed = b.studentIds.some(id => attendanceValues[id] !== b.attendance?.[id]);
+    const attendanceValues = Object.fromEntries(b.studentIds.map(id => [id, v.attendance?.[id] ?? (['present', 'late'].includes(b.attendance?.[id]) ? 'present' : ['absent', 'leave'].includes(b.attendance?.[id]) ? 'absent' : undefined)]));
+    const changed = b.studentIds.some(id => attendanceValues[id] !== (['present', 'late'].includes(b.attendance?.[id]) ? 'present' : ['absent', 'leave'].includes(b.attendance?.[id]) ? 'absent' : undefined));
     const submitAttendance = () => {
       try {
         setDb(saveSessionAttendance(db, b.id, attendanceValues, v.reason));
-        message.success('已儲存考勤與課消');
-        close();
+        message.success('已儲存考勤');
+        put('attendance', attendanceValues);
       } catch (e) { setError(e.message); }
     };
-    return modal('課堂詳情', <><div className="session-summary"><Status value={b.status} /><dl className="session-summary-fields"><div><dt>課程</dt><dd>{courseName(db, b.courseId)}</dd></div><div><dt>日期</dt><dd>{b.date}</dd></div><div><dt>時間</dt><dd>{b.start}–{b.end}</dd></div><div><dt>老師</dt><dd>{teacherName(db, b.teacherId)}</dd></div></dl></div>
+    return modal('課堂詳情', <><div className="session-summary"><Status value={b.pendingConsumption ? 'pendingConsumption' : b.status} /><dl className="session-summary-fields"><div><dt>課程</dt><dd>{courseName(db, b.courseId)}</dd></div><div><dt>日期</dt><dd>{b.date}</dd></div><div><dt>時間</dt><dd>{b.start}–{b.end}</dd></div><div><dt>老師</dt><dd>{teacherName(db, b.teacherId)}</dd></div></dl></div>
       <div className="session-roster-heading"><h3>學生列表 · {b.studentIds.length} 人</h3>{!locked && <Button onClick={() => put('attendance', Object.fromEntries(b.studentIds.map(id => [id, 'present'])))}>一鍵出勤</Button>}</div>
       <div className="session-students-table"><table><thead><tr><th scope="col">中文名</th><th scope="col">英文名</th><th scope="col">考勤狀態</th><th scope="col">考勤操作</th></tr></thead><tbody>{b.studentIds.map(id => {
         const student = db.students.find(s => s.id === id);
-        const attendance = pendingDeductions(db).some(l => l.sessionId === b.id && l.studentId === id) ? '已到課 · 待補扣' : b.status === 'completed' ? { present: '出席', late: '遲到', leave: '請假', absent: '缺席' }[b.attendance?.[id]] || '未記錄' : b.status === 'cancelled' ? '已取消' : '待記錄';
-        return <tr key={id}><td>{student?.name || '—'}</td><td>{student?.english || '—'}</td><td>{attendance}</td><td><Select className="session-attendance-select" aria-label={`${student?.name || id}考勤`} placeholder="選擇考勤" disabled={locked} value={attendanceValues[id]} onChange={value => put('attendance', {...attendanceValues, [id]: value})} options={[{value:'present',label:'出席'},{value:'late',label:'遲到'},{value:'leave',label:'請假'},{value:'absent',label:'缺席'}]} /></td></tr>;
+        const attendance = b.status === 'cancelled' ? '已取消' : ['absent', 'leave'].includes(b.attendance?.[id]) ? '缺勤 · 不扣課時' : ['present', 'late'].includes(b.attendance?.[id]) ? (hasConfirmedConsumption(db,b.id,id) ? '出勤 · 已確認課銷' : '出勤 · 待確認課銷') : '待記錄';
+        return <tr key={id}><td>{student?.name || '—'}</td><td>{student?.english || '—'}</td><td>{attendance}</td><td><Select className="session-attendance-select" aria-label={`${student?.name || id}考勤`} placeholder="選擇考勤" disabled={locked} value={attendanceValues[id]} onChange={value => put('attendance', {...attendanceValues, [id]: value})} options={[{value:'present',label:'出勤'},{value:'absent',label:'缺勤'}]} /></td></tr>;
       })}</tbody></table></div>
       {b.status === 'scheduled' && <Field label="增加學生 · 可多選"><div className="session-add-students"><Select mode="multiple" aria-label="增加學生" placeholder="選擇要加入本堂課的學生" value={v.addStudentIds || []} onChange={ids => put('addStudentIds', ids)} options={db.students.filter(s => !b.studentIds.includes(s.id)).map(s => ({ value: s.id, label: `${s.name} · ${s.english || ''} · ${s.grade}` }))} /><Button disabled={!v.addStudentIds?.length} onClick={() => {
         try { setDb(addSessionStudents(db, b.id, v.addStudentIds)); put('addStudentIds', []); message.success('學生已加入本堂課'); }
         catch (e) { setError(e.message); }
       }}>增加學生</Button></div></Field>}
       {!locked && b.status === 'completed' && changed && <Field label="更正原因"><Input.TextArea required value={v.reason} onChange={e => put('reason', e.target.value)} placeholder="請填寫更正考勤的原因" /></Field>}
+      {!locked && b.pendingConsumption && <div className="session-consumption-confirm"><p>出勤已記錄，待授課老師 {teacherName(db, b.teacherId)} 確認課銷；缺勤不扣課時。</p><Popconfirm title={`確認由 ${teacherName(db, b.teacherId)} 核對並確認本堂課銷？`} onConfirm={() => {
+        try { setDb(confirmSessionConsumption(db, b.id, role === 'teacher' ? teacherId : b.teacherId)); message.success('已確認課銷'); close(); }
+        catch (e) { setError(e.message); }
+      }}><Button type="primary" disabled={changed}>老師確認課銷</Button></Popconfirm>{changed && <small>請先儲存考勤變更，再確認課銷。</small>}</div>}
       {locked && b.status !== 'cancelled' && <p className="muted">此課堂已開單，請先處理相關單據再更正考勤。</p>}
       </>, locked ? undefined : submitAttendance, b.status === 'completed' ? '儲存考勤' : '確認考勤', 760);
   }
-  if (d.type === 'attendance') return modal('考勤 · 學生列表', <><div className="dialog-intro">{d.session.date} · {d.session.start}–{d.session.end} · {courseName(db, d.session.courseId)}</div><div className="attendance-list">{d.session.studentIds.map(id => {
-        const student = db.students.find(x => x.id === id);
-        const s = {
-          ...student,
-          mode: lessonCharge(db, d.session, id).mode
-        };
-        return <div key={id}><div><b>{s.name}</b><small>{s.mode === 'package' ? `剩餘 ${s.balance} 堂` : '按次付費 · 到課後待開單'}</small></div><Select style={{
-            width: 200
-          }} value={v.attendance[id]} onChange={x => put('attendance', {
-            ...v.attendance,
-            [id]: x
-          })} options={[{
-            value: 'present',
-            label: '出席 · 扣 1 堂'
-          }, {
-            value: 'late',
-            label: '遲到 · 扣 1 堂'
-          }, {
-            value: 'leave',
-            label: '請假 · 不扣課'
-          }, {
-            value: 'absent',
-            label: '缺席 · 不扣課'
-          }].map(o => s.mode === 'single' ? {
-            ...o,
-            label: o.label.replace('扣 1 堂', '待開單')
-          } : o)} /></div>;
-      })}</div><Field label="課後記錄"><Input.TextArea rows={3} value={v.note} onChange={e => put('note', e.target.value)} placeholder="今日學習內容、回家練習..." /></Field><Alert type="info" showIcon title="確認後完成本次課堂並記入課時流水；相同課堂不能重複扣課。" /></>, () => {
-    try {
-      const next = completeSession(db, d.session.id, v.attendance, v.note);
-      setDb(next);
-      message.success('已完成考勤與課消');
-      close();
-    } catch (e) {
-      setError(e.message);
-    }
-  }, '確認完成課堂');
   if (d.type === 'correction') return modal('更正考勤', <><Alert type="info" title="原扣課會退回，課堂恢復待記錄；更正原因及流水會保留。已開單的課堂不能在此更正。" /><Field label="更正原因"><Input.TextArea required value={v.reason} onChange={e => put('reason', e.target.value)} placeholder="例如誤記出席，實際請假。" /></Field></>, () => {
     try {
       const next = reverseAttendance(db, d.session.id, v.reason);
@@ -813,7 +731,7 @@ function Dialogs({
       }))} /></Field></>, () => {
     try {
       setDb(registerPayment(db, d.invoice.id, v.method));
-      message.success('已收款，課包已入帳並補扣待處理課時');
+      message.success('已收款，購買課時已入帳');
       close();
     } catch (e) {
       setError(e.message);
@@ -830,8 +748,8 @@ function BillingDialog({
   record
 }) {
   const [v, setV] = useState({
-    studentId: d.studentId || db.students[0]?.id,
-    source: d.source === 'lesson' ? 'lesson' : 'package',
+    studentId: d.studentId,
+    source: 'package',
     kind: 'invoice',
     courseId: undefined,
     packageCount: null,
@@ -857,16 +775,7 @@ function BillingDialog({
     }));
     setError('');
   };
-  const eligible = db.sessions.filter(b => b.status === 'completed' && b.studentIds.includes(v.studentId) && ['present', 'late'].includes(b.attendance[v.studentId]) && lessonCharge(db, b, v.studentId).mode === 'single' && !db.invoices.some(i => !i.voided && i.studentId === v.studentId && i.lines.some(l => l.sessionId === b.id)));
-  const lines = v.source === 'lesson' ? eligible.filter(b => v.sessionIds.includes(b.id)).map(b => ({
-    sessionId: b.id,
-    description: courseName(db, b.courseId),
-    lessonDate: b.date,
-    time: `${b.start}–${b.end}`,
-    duration: `${mins(b.end) - mins(b.start)} 分鐘`,
-    quantity: 1,
-    unitPrice: lessonCharge(db, b, v.studentId).unitPrice
-  })) : v.courseId && Number.isSafeInteger(v.packageCount) && v.packageCount > 0 && v.unitPrice != null ? [{
+  const lines = v.courseId && Number.isSafeInteger(v.packageCount) && v.packageCount > 0 && v.unitPrice != null ? [{
     courseId: v.courseId,
     description: `${courseName(db, v.courseId)} · ${v.packageCount} 堂`,
     quantity: v.packageCount,
@@ -897,7 +806,7 @@ function BillingDialog({
       paidDate: paid ? todayHK() : null,
       lines: structuredClone(lines)
     };
-    setDb(old => settleCredits({
+    setDb(old => ({
       ...old,
       invoices: [invoice, ...old.invoices],
       students: old.students.map(s => s.id === v.studentId && paid && v.source === 'package' ? {
@@ -913,23 +822,22 @@ function BillingDialog({
         note: invoice.no
       }] : old.ledger,
       history: record(old, `開立 ${invoice.no} · ${money(total.total)}`)
-    }, v.studentId));
+    }));
     message.success(paid ? '已開立單據並登記收款' : '帳單已開立，等待收款');
     close();
   };
-  return <Modal open width={800} title="登記收費" onCancel={close} footer={<div className="modal-actions"><span className="muted">{v.kind === 'invoice' ? '只開帳單，尚未收款' : '確認代表已實際收到款項'}</span><Button onClick={close}>取消</Button><Button type="primary" htmlType="submit" form="billing-form">{v.kind === 'invoice' ? '開立帳單' : '確認收款並開立'}</Button></div>}><form ref={formRef} id="billing-form" onSubmit={e => {
+  return <Modal open width={800} title="購課 / 續費" onCancel={close} footer={<div className="modal-actions"><span className="muted">{v.kind === 'invoice' ? '只開帳單，尚未收款' : '確認代表已實際收到款項'}</span><Button onClick={close}>取消</Button><Button type="primary" htmlType="submit" form="billing-form">{v.kind === 'invoice' ? '開立待收款帳單' : '確認收款並開立'}</Button></div>}><form ref={formRef} id="billing-form" onSubmit={e => {
       e.preventDefault();
       submit();
-    }}><div className="form-grid"><Field label="學生"><Select value={v.studentId} onChange={x => put('studentId', x)} options={options(db.students)} /></Field><Field label="款項收到了嗎？"><Select value={v.kind} onChange={x => put('kind', x)} options={[{
+    }}><div className="form-grid"><Field label="學生"><Select showSearch optionFilterProp="label" placeholder="選擇學生" value={v.studentId} onChange={x => put('studentId', x)} options={options(db.students)} /></Field><Field label="單據類型"><Select value={v.kind} onChange={x => put('kind', x)} options={[{
             value: 'invoice',
-            label: '尚未收到，先開帳單'
+            label: 'Invoice · 帳單（未收款）'
+          }, {
+            value: 'receipt', label: 'Receipt · 收據（已收款）'
           }, {
             value: 'both',
-            label: '已收到，開帳單及收據'
-          }]} /></Field>{v.source === 'lesson' ? <Field label="選擇已到課的按次付費記錄" wide><Select mode="multiple" placeholder="先完成考勤，再選擇待開單課堂" value={v.sessionIds} onChange={x => put('sessionIds', x)} options={eligible.map(b => ({
-            value: b.id,
-            label: `${b.date} ${b.start} · ${courseName(db, b.courseId)} · ${money(lessonCharge(db, b, v.studentId).unitPrice)}`
-          }))} />{!eligible.length && <small>此學生沒有待開單的按次課堂。課包學生的到課只扣課時，不重複收費。</small>}</Field> : <><Field label="購買課程" wide><Select aria-label="購買課程" placeholder="先選擇課程" value={v.courseId} onChange={x => put('courseId', x)} options={options(db.courses)} notFoundContent="請先新增課程" /></Field><Field label="購買堂數"><InputNumber aria-label="購買堂數" required disabled={!v.courseId} min={1} max={100} precision={0} placeholder="輸入購買堂數" value={v.packageCount} onChange={x => put('packageCount', x)} /></Field><Field label="每堂價格 · HKD"><InputNumber required disabled={!v.courseId} min={0} precision={2} value={v.unitPrice} onChange={x => put('unitPrice', x)} /></Field><div className="wide"><Alert type="info" title="登記收款後，購買的課時會加入學生剩餘課時。" /></div></>}</div><div className="bill-preview">{lines.map((l, i) => <div key={i}><span>{l.description}<small>{l.lessonDate} {l.time} · {l.quantity} × {money(l.unitPrice)}</small></span><b>{money(l.quantity * l.unitPrice)}</b></div>)}{!lines.length && <p className="muted">選擇課程並填寫堂數後，這裡會顯示單據明細。</p>}</div>{v.kind !== 'invoice' && <Field label="付款方式"><Select value={v.method} onChange={x => put('method', x)} options={['FPS 轉數快', '現金', '銀行轉帳', '信用卡', '支票'].map(x => ({
+            label: 'Invoice + Receipt · 帳單及收據（已收款）'
+          }]} /></Field><><Field label="購買課程" wide><Select aria-label="購買課程" placeholder="先選擇課程" value={v.courseId} onChange={x => put('courseId', x)} options={options(db.courses)} notFoundContent="請先新增課程" /></Field><Field label="購買堂數"><InputNumber aria-label="購買堂數" required disabled={!v.courseId} min={1} max={100} precision={0} placeholder="輸入購買堂數" value={v.packageCount} onChange={x => put('packageCount', x)} /></Field><Field label="每堂價格 · HKD"><InputNumber required disabled={!v.courseId} min={0} precision={2} value={v.unitPrice} onChange={x => put('unitPrice', x)} /></Field><div className="wide"><Alert type="info" title="登記收款後，購買的課時會加入學生剩餘課時。" /></div></></div><div className="bill-preview">{lines.map((l, i) => <div key={i}><span>{l.description}<small>{l.lessonDate} {l.time} · {l.quantity} × {money(l.unitPrice)}</small></span><b>{money(l.quantity * l.unitPrice)}</b></div>)}{!lines.length && <p className="muted">選擇課程並填寫堂數後，這裡會顯示單據明細。</p>}</div>{v.kind !== 'invoice' && <Field label="付款方式"><Select value={v.method} onChange={x => put('method', x)} options={['FPS 轉數快', '現金', '銀行轉帳', '信用卡', '支票'].map(x => ({
           value: x,
           label: x
         }))} /></Field>}<details className="advanced-options"><summary>更多設定：折扣、附加費及備註</summary><div className="form-grid"><Field label="附加費 · HKD"><InputNumber min={0} precision={2} value={v.surcharge} onChange={x => put('surcharge', x || 0)} /></Field><Field label="折扣方式"><Select value={v.discountKind} onChange={x => put('discountKind', x)} options={[{

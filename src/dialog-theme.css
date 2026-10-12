@@ -127,3 +127,5 @@
 .session-add-students>.ant-select{flex:1;min-width:0}
 [data-ui-theme="mac"] .ant-modal .session-add-students>.ant-btn{height:40px;flex-shrink:0;margin:0}
 @media(max-width:640px){.session-add-students{flex-direction:row;align-items:center}.session-attendance-select{width:110px}}
+
+.session-consumption-confirm{margin-top:18px;padding:16px;background:var(--dialog-surface,#f2f6fc);border-radius:12px}.session-consumption-confirm p{margin-bottom:12px;font-size:13px}.session-consumption-confirm small{margin-top:8px}

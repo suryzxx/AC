@@ -9,7 +9,15 @@ export function dashboardStats(db, from, to) {
   const lessons = [];
   for (const b of db.sessions.filter(s => inRange(s.date) && ['completed', 'scheduled'].includes(s.status))) {
     const teacher = teacherMap.get(b.teacherId);
-    if (b.status === 'scheduled') { if (teacher) teacher.scheduled++; continue; }
+    if (b.status === 'scheduled') {
+      if (teacher) teacher.scheduled++;
+      for (const id of b.pendingConsumption ? b.studentIds : []) {
+        const deducted = db.ledger.some(l => l.sessionId === b.id && l.studentId === id && l.type === '上課扣減' && !l.reversed && l.delta < 0);
+        const student = studentMap.get(id);
+        if (student && deducted) { student.consumed += Number(lessonCharge(db,b,id).unitPrice) || 0; student.used++; }
+      }
+      continue;
+    }
     let amount = 0, attendees = 0;
     for (const id of b.studentIds) {
       if (!['present', 'late'].includes(b.attendance?.[id])) continue;

@@ -1,0 +1,22 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {seed,normalizeDb,upgradeDemoCourses,upgradeDemoCalendar,upgradeDemoTeacherVariety,validateSessions} from '../src/model.js';
+test('KK has the busiest diverse schedule; existing records survive and upgrades are idempotent',()=>{
+  const original=upgradeDemoCalendar(normalizeDb(upgradeDemoCourses(seed())),'2026-10-12');
+  const snapshot=structuredClone(original);
+  const db=upgradeDemoTeacherVariety(original,'2026-10-12');
+  const kk=db.teachers.find(t=>t.name==='KK');
+  assert.equal(kk.type,'full');
+  assert.equal(kk.avatar,'/avatars/kk.png');
+  const added=db.sessions.filter(s=>s.id.startsWith('demo-variety-'));
+  assert.equal(added.length,40);
+  const kkLessons=added.filter(s=>s.teacherId===kk.id);
+  assert.equal(kkLessons.length,24);
+  assert.ok(new Set(kkLessons.map(s=>s.courseId)).size>1);
+  assert.ok(kkLessons.some(s=>s.studentIds.length>1));
+  for(const s of added) assert.equal(validateSessions(db,[s],s.id),'',s.id);
+  assert.deepEqual(original,snapshot);
+  assert.deepEqual(db.sessions.slice(0,original.sessions.length),original.sessions);
+  assert.deepEqual(db.teachers.slice(0,original.teachers.length),original.teachers);
+  assert.equal(upgradeDemoTeacherVariety(db),db);
+});

@@ -7,12 +7,13 @@ test('all current students and scheduled lessons use credits without inventing b
  assert.ok(after.students.every(s=>s.mode==='package'));
  assert.deepEqual(after.students.map(s=>s.balance),before.students.map(s=>s.balance));
  assert.ok(after.sessions.filter(s=>s.status==='scheduled').every(s=>Object.values(s.charges).every(c=>c.mode==='package')));
- const done=completeSession(after,'b3',{s4:'present'},'');
- assert.equal(done.ledger.at(-1).type,'待補扣');
+ assert.throws(()=>completeSession(after,'b3',{s4:'present'},''),/先購課/);
  assert.deepEqual(usePurchasedLessonCredits(after),after);
 });
 test('completed lessons, invoices and ledger are preserved during migration',()=>{
- const before=completeSession(normalizeDb(seed()),'b3',{s4:'present'},'');
+ const before=normalizeDb(seed());
+ before.sessions.find(s=>s.id==='b3').status='completed';
+ before.ledger.push({id:'legacy',sessionId:'b3',type:'按次待開單',delta:0});
  const after=usePurchasedLessonCredits(before);
  assert.deepEqual(after.sessions.find(s=>s.id==='b3'),before.sessions.find(s=>s.id==='b3'));
  assert.deepEqual(after.ledger,before.ledger);

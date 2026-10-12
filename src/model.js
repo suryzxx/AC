@@ -337,6 +337,7 @@ export function completeSession(db, id, attendance, note) {
   if (b.studentIds.some(id => !['present', 'late', 'leave', 'absent'].includes(attendance[id]))) throw Error('請逐位確認出勤');
   const charges = Object.fromEntries(b.studentIds.map(id => [id, lessonCharge(db, b, id)]));
   const pending = deductions.filter(id => charges[id].mode === 'package' && db.students.find(s => s.id === id).balance < 1);
+  if (deductions.some(id => charges[id].mode !== 'package') || pending.length) throw Error('請先購課並確認收款，課時充足後才能上課');
   const time = new Date().toISOString();
   return {
     ...db,
@@ -367,14 +368,38 @@ export function completeSession(db, id, attendance, note) {
     }, ...db.history]
   };
 }
-// Save the full roster atomically; corrections retain the existing reversal audit.
+// Attendance is recorded separately from the teacher's lesson-consumption confirmation.
 export function saveSessionAttendance(db, id, attendance, reason = '') {
   const lesson = db.sessions.find(session => session.id === id);
   if (!lesson || lesson.status === 'cancelled') throw Error('此課堂不能記錄考勤');
-  if (lesson.studentIds.some(studentId => !['present', 'late', 'leave', 'absent'].includes(attendance[studentId]))) throw Error('請逐位確認出勤');
-  if (lesson.status === 'completed' && lesson.studentIds.every(studentId => lesson.attendance?.[studentId] === attendance[studentId])) return db;
-  const next = lesson.status === 'completed' ? reverseAttendance(db, id, reason) : db;
-  return completeSession(next, id, Object.fromEntries(lesson.studentIds.map(studentId => [studentId, attendance[studentId]])), lesson.note || '');
+  if (lesson.studentIds.some(studentId => !['present', 'absent'].includes(attendance[studentId]))) throw Error('請逐位選擇出勤或缺勤');
+  if (lesson.studentIds.some(studentId => attendance[studentId] === 'present' && !hasConfirmedConsumption(db, id, studentId) && (lessonCharge(db, lesson, studentId).mode !== 'package' || db.students.find(s => s.id === studentId)?.balance < 1))) throw Error('請先購課並確認收款，課時充足後才能上課');
+  if (lesson.studentIds.every(studentId => (['present', 'late'].includes(lesson.attendance?.[studentId]) ? 'present' : ['absent', 'leave'].includes(lesson.attendance?.[studentId]) ? 'absent' : undefined) === attendance[studentId])) return db;
+  if (lesson.status === 'completed' && !reason.trim()) throw Error('請填寫更正原因');
+  let next = db;
+  for (const studentId of lesson.studentIds) {
+    if (attendance[studentId] === 'absent' && lesson.attendance?.[studentId] !== 'absent') next = markStudentAbsent(next,id,studentId);
+  }
+  const pendingConsumption = lesson.studentIds.some(studentId => attendance[studentId] === 'present' && !hasConfirmedConsumption(next,id,studentId));
+  return {
+    ...next,
+    sessions: next.sessions.map(session => session.id === id ? {
+      ...session, attendance: Object.fromEntries(lesson.studentIds.map(studentId => [studentId, attendance[studentId]])),
+      status: pendingConsumption ? 'scheduled' : 'completed', pendingConsumption,
+      consumptionConfirmedBy: undefined, consumptionConfirmedAt: undefined
+    } : session),
+    history: audit(next, `記錄 ${lesson.date} ${lesson.start} 考勤${pendingConsumption ? '，待老師確認課銷' : '，全員缺勤，不扣課時'}`)
+  };
+}
+export function confirmSessionConsumption(db, id, teacherId) {
+  const lesson = db.sessions.find(session => session.id === id);
+  if (!lesson || lesson.status !== 'scheduled' || !lesson.pendingConsumption) throw Error('沒有待確認的課銷，不能重複扣課');
+  if (teacherId !== lesson.teacherId) throw Error('請由授課老師確認課銷');
+  let next = db;
+  for (const studentId of lesson.studentIds.filter(id => ['present','late'].includes(lesson.attendance[id]))) {
+    if (!hasConfirmedConsumption(next,id,studentId)) next = confirmStudentConsumption(next,id,studentId,teacherId);
+  }
+  return next;
 }
 
 export function totals(lines, surcharge, kind, value) {
@@ -388,14 +413,7 @@ export function totals(lines, surcharge, kind, value) {
   };
 }
 export function billableLessons(db) {
-  return db.sessions.filter(b => b.status === 'completed').flatMap(b => b.studentIds.filter(id => lessonCharge(db, b, id).mode === 'single' && ['present', 'late'].includes(b.attendance[id]) && !db.invoices.some(i => !i.voided && i.studentId === id && i.lines.some(l => l.sessionId === b.id))).map(id => ({
-    id: `${b.id}:${id}`,
-    sessionId: b.id,
-    studentId: id,
-    date: b.date,
-    start: b.start,
-    courseId: b.courseId
-  })));
+  return [];
 }
 export function reverseAttendance(db, id, reason) {
   const b = db.sessions.find(x => x.id === id);
@@ -412,7 +430,10 @@ export function reverseAttendance(db, id, reason) {
     sessions: db.sessions.map(x => x.id === id ? {
       ...x,
       status: 'scheduled',
-      attendance: {}
+      attendance: {},
+      pendingConsumption: false,
+      consumptionConfirmedBy: undefined,
+      consumptionConfirmedAt: undefined
     } : x),
     ledger: [...db.ledger.map(l => entries.some(e => e.id === l.id) ? {
       ...l,
@@ -458,30 +479,11 @@ export function audit(db, text) {
   }, ...db.history];
 }
 export function pendingDeductions(db) {
-  return db.ledger.filter(l => l.type === '待補扣' && !l.reversed && !l.settled);
+  return [];
 }
+// Legacy callers must never deduct old unpaid lessons from new purchases.
 export function settleCredits(db, studentId) {
-  let balance = db.students.find(s => s.id === studentId)?.balance || 0;
-  const ids = pendingDeductions(db).filter(l => l.studentId === studentId).sort((a, b) => a.date.localeCompare(b.date)).slice(0, Math.floor(balance)).map(l => l.id);
-  if (!ids.length) return db;
-  return {
-    ...db,
-    students: db.students.map(s => s.id === studentId ? {
-      ...s,
-      balance: s.balance - ids.length
-    } : s),
-    ledger: [...db.ledger.map(l => ids.includes(l.id) ? {
-      ...l,
-      settled: true
-    } : l), ...db.ledger.filter(l => ids.includes(l.id)).map(l => ({
-      ...l,
-      id: uid(),
-      type: '上課扣減',
-      delta: -1,
-      note: '續費後補扣 · ' + l.note
-    }))],
-    history: audit(db, `${studentName(db, studentId)} 補扣 ${ids.length} 堂已上課記錄`)
-  };
+  return db;
 }
 export function registerPayment(db, id, method, paidDate = todayHK()) {
   const i = db.invoices.find(i => i.id === id);
@@ -511,7 +513,7 @@ export function registerPayment(db, id, method, paidDate = todayHK()) {
     }] : db.ledger,
     history: audit(db, `登記收款 ${i.no} · ${money(i.total)}`)
   };
-  return settleCredits(next, i.studentId);
+  return next;
 }
 export function fixInvoice(db, id, action, reason) {
   const i = db.invoices.find(i => i.id === id);
@@ -614,7 +616,7 @@ export function leaveLesson(db, id, studentId, reason, makeup, role = 'admin') {
 }
 export function switchBillingMode(db, studentId, mode) {
   const s = db.students.find(s => s.id === studentId);
-  if (!s || !['package', 'single'].includes(mode)) throw Error('無效學生或方式');
+  if (!s || mode !== 'package') throw Error('僅支援先購課再排課');
   return {
     ...normalizeDb(db),
     students: db.students.map(x => x.id === studentId ? {
@@ -671,6 +673,7 @@ export function commitSchedule(db, drafts, opts = {}) {
   if (ready.some(b => b.date < todayHK())) throw Error('安排日期已過，請選擇新的日期');
   const conflict = validateSessions(base, ready);
   if (conflict) throw Error(conflict);
+  assertBookingCredits(base, ready);
   if (request && opts.confirmation === 'propose') return {
     ...db,
     requests: db.requests.map(r => r.id === request.id ? {
@@ -726,6 +729,7 @@ export function changeSeries(db, original, next) {
   const drafts = seriesDrafts(db, original, next),
     ids = new Set(drafts.map(b => b.id));
   if (drafts.some(b => b.date < todayHK())) throw Error('不能把課堂移到過去');
+  assertBookingCredits({...db,sessions:db.sessions.filter(s=>!ids.has(s.id))},drafts);
   const conflict = validateSessions({
     ...db,
     sessions: db.sessions.filter(b => !ids.has(b.id))
@@ -841,8 +845,174 @@ export function addSessionStudents(db, sessionId, studentIds) {
   if (additions.some(id => !db.students.some(s => s.id === id))) throw Error('學生資料不存在');
   const updated = { ...session, studentIds: [...session.studentIds, ...additions],
     charges: { ...session.charges, ...Object.fromEntries(additions.map(id => [id, lessonCharge(db, session, id)])) } };
+  assertBookingCredits({...db,sessions:db.sessions.filter(s=>s.id!==sessionId)},[updated]);
   const conflict = validateSessions(db, [updated], sessionId);
   if (conflict) throw Error(conflict);
   return { ...db, sessions: db.sessions.map(s => s.id === sessionId ? updated : s),
     history: audit(db, `課堂增加學生：${additions.map(id => studentName(db, id)).join('、')} · ${session.date} ${session.start}`) };
+}
+
+// Extend existing demos once, preserving edited teachers, lessons, and balances.
+export function upgradeDemoTeacherVariety(db, referenceDate = todayHK()) {
+  if (db.demoTeacherVarietyVersion >= 1) return db;
+  const kkId = 'demo-teacher-kk';
+  const kk = { id: kkId, name: 'KK', english: 'KK', type: 'full',
+    avatar: '/avatars/kk.png', color: '#a16cc1',
+    subjects: db.courses.map(course => course.id), grades: ['P3', 'P4', 'P5', 'P6'],
+    weekly: [{ days: [1, 2, 3, 4, 5, 6], start: '10:00', end: '19:00' }], extra: [] };
+  let next = { ...db, teachers: db.teachers.some(t => t.id === kkId) ? db.teachers : [...db.teachers, kk], sessions: [...db.sessions] };
+  const monday = dateAdd(referenceDate, -((new Date(referenceDate + 'T12:00:00').getDay() + 6) % 7));
+  const clock = minutes => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+  for (const [teacherIndex, [teacherId, count, preferredHour]] of [[kkId, 24, 10], ['t1', 8, 14], ['t2', 5, 12], ['t3', 3, 16]].entries()) {
+    const teacher = next.teachers.find(t => t.id === teacherId);
+    if (!teacher) continue;
+    const courses = next.courses.filter(c => teacher.subjects.includes(c.id));
+    const students = next.students.filter(s => teacher.grades.includes(s.grade));
+    if (!courses.length || !students.length) continue;
+    for (let index = 0; index < count; index++) {
+      const id = `demo-variety-${teacherId}-${index}`;
+      if (next.sessions.some(s => s.id === id)) continue;
+      const courseId = courses[(index + teacherIndex) % courses.length].id;
+      let lesson;
+      for (let offset = 0; offset < 6 && !lesson; offset++) {
+        const date = dateAdd(monday, (Math.floor(index / (teacherId === kkId ? 4 : 2)) + offset) % 6);
+        for (let step = 0; step < 18 && !lesson; step++) {
+          const start = 600 + ((preferredHour * 60 - 600 + (index % 4) * 120 + step * 30) % 540);
+          const duration = (index + teacherIndex) % 3 === 0 ? 90 : 60;
+          for (let pick = 0; pick < students.length && !lesson; pick++) {
+            const student = students[(index * 3 + teacherIndex + pick) % students.length];
+            const draft = { id, date, start: clock(start), end: clock(start + duration), teacherId, courseId,
+              studentIds: [student.id], status: 'scheduled', attendance: {}, note: '模擬課堂 · 多樣化老師課表' };
+            if (validateSessions(next, [draft])) continue;
+            if (index % 3 === 1) {
+              const partner = students.find(s => s.id !== student.id && !validateSessions(next, [{ ...draft, studentIds: [student.id, s.id] }]));
+              if (partner) draft.studentIds.push(partner.id);
+            }
+            lesson = draft;
+          }
+        }
+      }
+      if (!lesson) continue;
+      lesson.charges = Object.fromEntries(lesson.studentIds.map(id => [id, lessonCharge(next, lesson, id)]));
+      next = { ...next, sessions: [...next.sessions, lesson] };
+      if (lesson.date <= referenceDate && index < (teacherId === kkId ? 4 : 1) && lesson.studentIds.every(id => lessonCharge(next, lesson, id).mode === 'package' && next.students.find(s => s.id === id).balance >= 1)) {
+        next = saveSessionAttendance(next, lesson.id, Object.fromEntries(lesson.studentIds.map(id => [id, 'present'])));
+        if (lesson.studentIds.every(id=>next.students.find(s=>s.id===id).balance>=1)) next = confirmSessionConsumption(next, lesson.id, teacherId);
+      }
+    }
+  }
+  return { ...next, demoTeacherVarietyVersion: 1 };
+}
+
+export function hasConfirmedConsumption(db, sessionId, studentId) {
+  return db.ledger.some(l => l.sessionId === sessionId && l.studentId === studentId && !l.reversed && ['上課扣減', '按次待開單'].includes(l.type));
+}
+function refreshConsumptionState(db, sessionId) {
+  return {...db, sessions: db.sessions.map(s => {
+    if (s.id !== sessionId) return s;
+    const pendingConsumption = s.studentIds.some(id => ['present','late'].includes(s.attendance?.[id]) && !hasConfirmedConsumption(db,s.id,id));
+    const unrecorded = s.studentIds.some(id => !s.attendance?.[id]);
+    return {...s, pendingConsumption, status: pendingConsumption || unrecorded ? 'scheduled' : 'completed'};
+  })};
+}
+export function confirmStudentConsumption(db, sessionId, studentId, teacherId) {
+  const s = db.sessions.find(s => s.id === sessionId);
+  if (!s || s.status === 'cancelled' || !s.studentIds.includes(studentId) || !['present','late'].includes(s.attendance?.[studentId])) throw Error('只能確認已出勤學生的課銷');
+  if (s.teacherId !== teacherId) throw Error('請由授課老師確認課銷');
+  if (hasConfirmedConsumption(db,sessionId,studentId)) throw Error('已確認課銷，不能重複扣課');
+  const charge = lessonCharge(db,s,studentId);
+  const student = db.students.find(x => x.id === studentId);
+  if (charge.mode !== 'package' || student.balance < 1) throw Error('課時不足，請先核對購課記錄');
+  const next = {...db,
+    students: db.students.map(x => x.id === studentId && charge.mode === 'package' ? {...x,balance:x.balance-1} : x),
+    ledger: [...db.ledger.map(l => l.sessionId === sessionId && l.studentId === studentId && l.type === '待補扣' && !l.reversed ? {...l,reversed:true} : l), {id:uid(),sessionId,studentId,date:s.date,delta:charge.mode === 'package' ? -1 : 0,type:charge.mode === 'package' ? '上課扣減' : '按次待開單',note:courseName(db,s.courseId),confirmedBy:teacherId,confirmedAt:new Date().toISOString()}],
+    history: audit(db, `${teacherName(db,teacherId)} 確認 ${student.name} ${s.date} 課銷`)};
+  return refreshConsumptionState(next,sessionId);
+}
+export function markStudentAbsent(db, sessionId, studentId) {
+  const s = db.sessions.find(s => s.id === sessionId);
+  if (!s || s.status === 'cancelled' || !s.studentIds.includes(studentId)) throw Error('課堂或學生不存在');
+  if (s.attendance?.[studentId] === 'absent') return db;
+  if (db.invoices.some(i => !i.voided && (!i.studentId || i.studentId === studentId) && i.lines.some(l => l.sessionId === sessionId))) throw Error('此學生課堂已開單，請先處理相關單據');
+  const entries = db.ledger.filter(l => l.sessionId === sessionId && l.studentId === studentId && !l.reversed && ['上課扣減','按次待開單','待補扣'].includes(l.type));
+  const refund = -entries.reduce((n,l)=>n+l.delta,0);
+  const next = {...db,
+    students:db.students.map(x=>x.id===studentId ? {...x,balance:x.balance+refund} : x),
+    sessions:db.sessions.map(x=>x.id===sessionId ? {...x,attendance:{...x.attendance,[studentId]:'absent'}} : x),
+    ledger:[...db.ledger.map(l=>entries.some(e=>e.id===l.id)?{...l,reversed:true}:l),...(entries.length?[{id:uid(),sessionId,studentId,date:todayHK(),delta:refund,type:'考勤更正',note:'出勤改為缺勤，取消課銷'}]:[])],
+    history:audit(db,`${studentName(db,studentId)} ${s.date} 改為缺勤，取消課銷`)};
+  return refreshConsumptionState(next,sessionId);
+}
+export function assertBookingCredits(db, drafts) {
+  if (drafts.some(s => s.studentIds.some(id => lessonCharge(db,s,id).mode !== 'package'))) throw Error('僅支援先購課再排課');
+  const reservations = new Map();
+  for (const s of [...db.sessions.filter(s=>s.status==='scheduled'),...drafts]) {
+    for (const id of s.studentIds) {
+      if (['absent','leave'].includes(s.attendance?.[id]) || hasConfirmedConsumption(db,s.id,id)) continue;
+      reservations.set(id,(reservations.get(id)||0)+1);
+    }
+  }
+  for (const id of new Set(drafts.flatMap(s=>s.studentIds))) {
+    if ((reservations.get(id)||0) > (db.students.find(s=>s.id===id)?.balance||0)) throw Error(`${studentName(db,id)} 可用課時不足（已扣除未課銷預約），請先購課再預約`);
+  }
+}
+
+// Bring prototype opening credits into line with its seeded reservations once.
+export function reconcileDemoBookingCredits(db) {
+  if (db.demoBookingCreditsVersion) return db;
+  let next = db;
+  for (const student of db.students.filter(s => /^s[1-6]$|^demo-student-/.test(s.id))) {
+    const reserved = db.sessions.filter(s=>s.status==='scheduled' && s.studentIds.includes(student.id) && !['absent','leave'].includes(s.attendance?.[student.id]) && !hasConfirmedConsumption(db,s.id,student.id)).length;
+    const pending = pendingDeductions(db).filter(l=>l.studentId===student.id).length;
+    const missing = Math.max(0,reserved+pending-student.balance);
+    if (missing) next = {...next,students:next.students.map(s=>s.id===student.id?{...s,balance:s.balance+missing}:s),ledger:[...next.ledger,{id:uid(),studentId:student.id,date:todayHK(),delta:missing,type:'初始課時錄入',note:'補齊模擬預約所需的初始課時'}]};
+    if (pending) next = settleCredits(next,student.id);
+  }
+  return {...next,demoBookingCreditsVersion:1};
+}
+
+// Add sample billing records once; use the real payment path for credit consistency.
+export function upgradeDemoBilling(db, referenceDate = todayHK()) {
+  if (db.demoBillingVersion >= 2) return db;
+  let next = db;
+  const samples = [
+    ['s1', 'c1', 10, 'paid', 'FPS 轉數快', 0],
+    ['s3', 'c2', 8, 'paid', '銀行轉帳', 100],
+    ['s6', 'c3', 6, 'paid', '現金', 0],
+    ['s2', 'c1', 10, 'pending', '', 0],
+    ['s5', 'c2', 5, 'pending', '', 0],
+    ['s4', 'c1', 4, 'void', '', 0]
+  ];
+  const demoStudents = db.students.filter(s => /^s[1-6]$|^demo-student-/.test(s.id));
+  for (let index = 0; index < 30 && demoStudents.length && db.courses.length; index++) {
+    samples.push([
+      demoStudents[index % demoStudents.length].id,
+      db.courses[index % db.courses.length].id,
+      [4, 6, 8, 10, 12][index % 5],
+      ['pending', 'paid', 'pending', 'paid', 'void'][index % 5],
+      ['FPS 轉數快', '現金', '銀行轉帳'][index % 3],
+      index % 4 === 0 ? 100 : 0
+    ]);
+  }
+  for (const [index, [studentId, courseId, count, state, method, discount]] of samples.entries()) {
+    const id = `demo-billing-${index + 1}`;
+    const course = next.courses.find(c => c.id === courseId);
+    if (!course || !next.students.some(s => s.id === studentId) || next.invoices.some(i => i.id === id)) continue;
+    const date = dateAdd(referenceDate, -index);
+    const lines = [{ courseId, description: `${course.name} · ${count} 堂`, quantity: count, unitPrice: course.price, lessonDate: '', time: '', duration: '按每次到課扣 1 堂' }];
+    const invoice = { id, studentId, courseId, source: 'package', packageCount: count,
+      kind: 'invoice', date, paid: false, paidDate: null,
+      no: `INV-DEMO-${date.replaceAll('-', '')}-${index + 1}`,
+      receiptNo: `REC-DEMO-${date.replaceAll('-', '')}-${index + 1}`,
+      issuer: 'AC Education', method, discountType: 'fixed', discountValue: discount,
+      remarks: '模擬購課資料，僅供原型操作體驗，非真實收費憑證。',
+      lines, ...totals(lines, 0, 'fixed', discount) };
+    next = { ...next, invoices: [...next.invoices, invoice] };
+    if (state === 'paid') {
+      next = registerPayment(next, id, method, date);
+      if (index >= 6 && index % 2 === 0) next = {...next, invoices: next.invoices.map(i => i.id === id ? {...i, kind:'receipt', no:i.receiptNo} : i)};
+    }
+    if (state === 'void') next = fixInvoice(next, id, 'void', '模擬範例：課程選錯，作廢後重新開單');
+  }
+  return { ...next, demoBillingVersion: 2 };
 }
