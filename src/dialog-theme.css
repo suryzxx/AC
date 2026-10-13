@@ -129,3 +129,20 @@
 @media(max-width:640px){.session-add-students{flex-direction:row;align-items:center}.session-attendance-select{width:110px}}
 
 .session-consumption-confirm{margin-top:18px;padding:16px;background:var(--dialog-surface,#f2f6fc);border-radius:12px}.session-consumption-confirm p{margin-bottom:12px;font-size:13px}.session-consumption-confirm small{margin-top:8px}
+
+.course-rate-row { display: flex; align-items: end; gap: 12px; margin-bottom: 16px; }
+.course-rate-row .field { flex: 1; min-width: 0; }
+.course-rate-row .ant-input-number { width: 100%; }
+
+/* Keep scheduling dates and times together, with repetition on its own row. */
+.schedule-datetime-row{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(2,minmax(0,1fr));gap:20px;min-width:0}
+.schedule-repeat-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;min-width:0}
+.schedule-datetime-row>.field,.schedule-repeat-row>.field{min-width:0}
+.schedule-datetime-row .ant-picker,.schedule-repeat-row .ant-input-number{width:100%}
+@media(max-width:640px){.schedule-datetime-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.schedule-datetime-row>.field:first-child{grid-column:1/-1}.schedule-repeat-row{gap:12px}}
+.schedule-student-course-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;min-width:0}
+.schedule-student-course-row>.field{min-width:0}
+@media(max-width:640px){.schedule-student-course-row{grid-template-columns:minmax(0,1fr);gap:12px}}
+.modal-actions .session-delete-action{margin-right:auto}
+.session-attendance-note { min-width: 180px; }
+.session-attendance-note textarea { width: 100%; }

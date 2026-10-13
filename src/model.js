@@ -1,3 +1,4 @@
+import { coursePrice } from './coursePricing.js';
 export const uid = () => crypto.randomUUID();
 export const dateAdd = (date, n) => {
   const d = new Date(`${date}T12:00:00`);
@@ -369,12 +370,19 @@ export function completeSession(db, id, attendance, note) {
   };
 }
 // Attendance is recorded separately from the teacher's lesson-consumption confirmation.
-export function saveSessionAttendance(db, id, attendance, reason = '') {
+export function saveSessionAttendance(db, id, attendance, reason = '', attendanceNote, attendanceNotes) {
   const lesson = db.sessions.find(session => session.id === id);
   if (!lesson || lesson.status === 'cancelled') throw Error('此課堂不能記錄考勤');
+  const note = attendanceNote === undefined ? (lesson.attendanceNote || '') : String(attendanceNote);
+  const notes = attendanceNotes === undefined ? lesson.attendanceNotes : Object.fromEntries(lesson.studentIds.map(studentId => [studentId, String(attendanceNotes[studentId] ?? lesson.attendanceNotes?.[studentId] ?? lesson.attendanceNote ?? '')]));
+  const notesChanged = lesson.studentIds.some(studentId => (notes?.[studentId] ?? '') !== (lesson.attendanceNotes?.[studentId] ?? ''));
+  const unchangedAttendance = lesson.studentIds.every(studentId => (['present', 'late'].includes(lesson.attendance?.[studentId]) ? 'present' : ['absent', 'leave'].includes(lesson.attendance?.[studentId]) ? 'absent' : undefined) === attendance[studentId]);
+  if (unchangedAttendance) {
+    if (note === (lesson.attendanceNote || '') && !notesChanged) return db;
+    return { ...db, sessions: db.sessions.map(session => session.id === id ? { ...session, attendanceNote: note, attendanceNotes: notes } : session), history: audit(db, `更新 ${lesson.date} ${lesson.start} 考勤備註`) };
+  }
   if (lesson.studentIds.some(studentId => !['present', 'absent'].includes(attendance[studentId]))) throw Error('請逐位選擇出勤或缺勤');
   if (lesson.studentIds.some(studentId => attendance[studentId] === 'present' && !hasConfirmedConsumption(db, id, studentId) && (lessonCharge(db, lesson, studentId).mode !== 'package' || db.students.find(s => s.id === studentId)?.balance < 1))) throw Error('請先購課並確認收款，課時充足後才能上課');
-  if (lesson.studentIds.every(studentId => (['present', 'late'].includes(lesson.attendance?.[studentId]) ? 'present' : ['absent', 'leave'].includes(lesson.attendance?.[studentId]) ? 'absent' : undefined) === attendance[studentId])) return db;
   if (lesson.status === 'completed' && !reason.trim()) throw Error('請填寫更正原因');
   let next = db;
   for (const studentId of lesson.studentIds) {
@@ -384,7 +392,7 @@ export function saveSessionAttendance(db, id, attendance, reason = '') {
   return {
     ...next,
     sessions: next.sessions.map(session => session.id === id ? {
-      ...session, attendance: Object.fromEntries(lesson.studentIds.map(studentId => [studentId, attendance[studentId]])),
+      ...session, absenceConfirmations: Object.fromEntries(Object.entries(session.absenceConfirmations || {}).filter(([studentId]) => ['absent','leave'].includes(lesson.attendance?.[studentId]) && attendance[studentId] === 'absent')), attendanceNote: note, attendanceNotes: notes, attendance: Object.fromEntries(lesson.studentIds.map(studentId => [studentId, attendance[studentId]])),
       status: pendingConsumption ? 'scheduled' : 'completed', pendingConsumption,
       consumptionConfirmedBy: undefined, consumptionConfirmedAt: undefined
     } : session),
@@ -431,6 +439,7 @@ export function reverseAttendance(db, id, reason) {
       ...x,
       status: 'scheduled',
       attendance: {},
+      absenceConfirmations: {},
       pendingConsumption: false,
       consumptionConfirmedBy: undefined,
       consumptionConfirmedAt: undefined
@@ -459,7 +468,7 @@ export function reverseAttendance(db, id, reason) {
 export function lessonCharge(db, lesson, studentId) {
   return lesson.charges?.[studentId] || {
     mode: db.students.find(s => s.id === studentId)?.mode || 'single',
-    unitPrice: db.courses.find(c => c.id === lesson.courseId)?.price || 0
+    unitPrice: coursePrice(db.courses.find(c => c.id === lesson.courseId), lesson.start && lesson.end ? mins(lesson.end) - mins(lesson.start) : undefined) ?? 0
   };
 }
 export function normalizeDb(db) {
@@ -758,22 +767,16 @@ export function suggestSlot(db, draft, from, to, duration = 60, excludeId) {
   return null;
 }
 
-// Opening credit records lessons already purchased, without creating a new payment.
-export function addStudentWithLessons(db, profile, purchasedLessons) {
-  if (!Number.isSafeInteger(purchasedLessons) || purchasedLessons < 0) throw Error('請輸入 0 或以上的整數課時');
+export function addStudent(db, profile) {
   const student = {
     id: uid(), name: profile.name, english: profile.english, grade: profile.grade,
     parent: profile.parent, phone: profile.phone, notes: profile.notes,
-    mode: 'package', balance: purchasedLessons
+    mode: 'package', balance: 0
   };
   return {
     ...db,
     students: [...db.students, student],
-    ledger: purchasedLessons ? [...db.ledger, {
-      id: uid(), studentId: student.id, date: todayHK(), delta: purchasedLessons,
-      type: '初始課時錄入', note: `建檔時錄入已購買 ${purchasedLessons} 堂`
-    }] : db.ledger,
-    history: [{ id: uid(), at: new Date().toISOString(), text: `新增學生 ${student.name} · 已購買 ${purchasedLessons} 堂` }, ...db.history]
+    history: [{ id: uid(), at: new Date().toISOString(), text: `新增學生 ${student.name}` }, ...db.history]
   };
 }
 
@@ -917,8 +920,13 @@ function refreshConsumptionState(db, sessionId) {
 }
 export function confirmStudentConsumption(db, sessionId, studentId, teacherId) {
   const s = db.sessions.find(s => s.id === sessionId);
-  if (!s || s.status === 'cancelled' || !s.studentIds.includes(studentId) || !['present','late'].includes(s.attendance?.[studentId])) throw Error('只能確認已出勤學生的課銷');
+  if (!s || s.status === 'cancelled' || !s.studentIds.includes(studentId) || !['present','late','absent','leave'].includes(s.attendance?.[studentId])) throw Error('請先記錄學生考勤再確認課銷');
   if (s.teacherId !== teacherId) throw Error('請由授課老師確認課銷');
+  if (['absent','leave'].includes(s.attendance[studentId])) {
+    if (db.invoices.some(i => !i.voided && i.lines?.some(l => l.sessionId === sessionId))) throw Error('此課堂已開單，請先處理相關單據');
+    if (s.absenceConfirmations?.[studentId]) throw Error('缺勤課銷已確認，不能重複確認');
+    return {...db, sessions:db.sessions.map(x=>x.id===sessionId?{...x,absenceConfirmations:{...x.absenceConfirmations,[studentId]:{confirmedBy:teacherId,confirmedAt:new Date().toISOString()}}}:x),history:audit(db,`${teacherName(db,teacherId)} 確認 ${studentName(db,studentId)} ${s.date} 缺勤課銷，不扣課時`)};
+  }
   if (hasConfirmedConsumption(db,sessionId,studentId)) throw Error('已確認課銷，不能重複扣課');
   const charge = lessonCharge(db,s,studentId);
   const student = db.students.find(x => x.id === studentId);
@@ -1015,4 +1023,20 @@ export function upgradeDemoBilling(db, referenceDate = todayHK()) {
     if (state === 'void') next = fixInvoice(next, id, 'void', '模擬範例：課程選錯，作廢後重新開單');
   }
   return { ...next, demoBillingVersion: 2 };
+}
+
+// Keep the original lesson and financial trail while removing it from active views.
+export function deleteSession(db, sessionId) {
+  const lesson = db.sessions.find(s => s.id === sessionId);
+  if (!lesson || lesson.status === 'cancelled') throw Error('課堂已刪除或不存在');
+  if (db.invoices.some(i => !i.voided && i.lines?.some(l => l.sessionId === sessionId))) throw Error('此課堂已開單，請先處理相關單據再刪除');
+  const entries = db.ledger.filter(l => l.sessionId === sessionId && !l.reversed && ['上課扣減','按次待開單','待補扣'].includes(l.type));
+  const deletedAt = new Date().toISOString();
+  return {
+    ...db,
+    students: db.students.map(s => ({...s, balance:s.balance - entries.filter(l => l.studentId === s.id).reduce((n,l) => n + l.delta, 0)})),
+    sessions: db.sessions.map(s => s.id === sessionId ? {...s, status:'cancelled', deletedAt, pendingConsumption:false} : s),
+    ledger: [...db.ledger.map(l => entries.some(e => e.id === l.id) ? {...l,reversed:true} : l), ...entries.map(l => ({id:uid(),sessionId,studentId:l.studentId,date:todayHK(),delta:-l.delta,type:'考勤更正',note:'刪除課堂，退回原扣課'}))],
+    history: audit(db, `刪除 ${lesson.date} ${lesson.start}–${lesson.end} ${courseName(db,lesson.courseId)} 課堂`)
+  };
 }

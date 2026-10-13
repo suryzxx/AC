@@ -199,3 +199,5 @@
 .student-credit-progress.is-low .student-credit-label b{color:#cf1322}
 .student-credit-progress.is-low .student-credit-track>div{background:#cf1322}
 .native-inspector .student-credit-progress{min-width:0}
+[data-ui-theme="mac"] .native-account>div{width:100%;display:grid;gap:4px}
+[data-ui-theme="mac"] .native-account .native-account-switch{justify-self:start;height:auto;min-height:32px;padding:6px 0;color:#007aff;font-size:12px;text-align:left}

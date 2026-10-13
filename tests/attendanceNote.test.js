@@ -1,0 +1,32 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { seed, saveSessionAttendance, confirmSessionConsumption } from '../src/model.js';
+test('attendance note persists, updates and clears without changing consumption or credits', () => {
+  let db = saveSessionAttendance(seed(), 'b2', { s1: 'present', s6: 'present' }, '', '學生遲到五分鐘\n已通知家長');
+  assert.equal(JSON.parse(JSON.stringify(db)).sessions.find(s => s.id === 'b2').attendanceNote, '學生遲到五分鐘\n已通知家長');
+  db = confirmSessionConsumption(db, 'b2', 't1');
+  const lesson = db.sessions.find(s => s.id === 'b2');
+  const students = db.students;
+  const ledger = db.ledger;
+  db = saveSessionAttendance(db, 'b2', lesson.attendance, '', '已補回');
+  assert.equal(db.sessions.find(s => s.id === 'b2').attendanceNote, '已補回');
+  assert.equal(db.sessions.find(s => s.id === 'b2').status, lesson.status);
+  assert.equal(db.students, students);
+  assert.equal(db.ledger, ledger);
+  const preserved = saveSessionAttendance(db, 'b2', lesson.attendance);
+  assert.equal(preserved, db);
+  db = saveSessionAttendance(db, 'b2', lesson.attendance, '', '');
+  assert.equal(db.sessions.find(s => s.id === 'b2').attendanceNote, '');
+});
+test('student attendance notes save separately and editing one preserves classmates and credits', () => {
+  let db = saveSessionAttendance(seed(), 'b2', { s1: 'present', s6: 'present' }, '', undefined, { s1: '遲到五分鐘', s6: '準時' });
+  db = confirmSessionConsumption(db, 'b2', 't1');
+  const students = db.students, ledger = db.ledger;
+  const attendance = db.sessions.find(s => s.id === 'b2').attendance;
+  db = saveSessionAttendance(db, 'b2', attendance, '', undefined, { s1: '' });
+  const notes = JSON.parse(JSON.stringify(db)).sessions.find(s => s.id === 'b2').attendanceNotes;
+  assert.deepEqual(notes, { s1: '', s6: '準時' });
+  assert.equal(db.students, students);
+  assert.equal(db.ledger, ledger);
+  assert.equal(saveSessionAttendance(db, 'b2', attendance), db);
+});

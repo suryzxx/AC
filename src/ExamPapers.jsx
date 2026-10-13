@@ -1,7 +1,7 @@
 /** @jsx localizedElement */
 import React, { useState } from 'react';
 import { App, Button, Input, InputNumber, Select, Modal, Table, Tag, Checkbox, Steps, Alert, Empty } from 'antd';
-import { PlusOutlined, SearchOutlined, ArrowUpOutlined, ArrowDownOutlined, DeleteOutlined, FileTextOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, ArrowUpOutlined, ArrowDownOutlined, DeleteOutlined, FileTextOutlined, PrinterOutlined } from '@ant-design/icons';
 import { PageHeading } from './NativeUI';
 import { localizedElement, t } from './language';
 import { loadResources } from './resourceStore';
@@ -23,7 +23,7 @@ export default function ExamPapers(){
  const save=draft=>{const record={...draft,title:draft.title.trim(),id:draft.id||crypto.randomUUID()};const next=draft.id?papers.map(x=>x.id===draft.id?record:x):[record,...papers];try{localStorage.setItem(EXAM_STORE,JSON.stringify(next));}catch{message.error(t('儲存失敗，請檢查瀏覽器儲存空間。'));return;}setPapers(next);setEditor(null);setSearch('');setGrade(undefined);message.success(t('已保存試卷'));};
  return <><PageHeading><div><h1>試卷</h1></div><Button type="primary" icon={<PlusOutlined />} onClick={()=>setEditor(blankExam())}>新建試卷</Button></PageHeading><AIResourceStudio type="papers" paperItems={papers} parent={null} onSaved={next=>{setPapers(next);setSearch('');setGrade(undefined);}} /><section className="exam-list"><div className="exam-list-toolbar"><div><b>試卷列表</b><small>{rows.length} 份試卷</small></div><div className="actions"><Select allowClear placeholder="全部年級" value={grade} options={grades} onChange={setGrade} /><Input prefix={<SearchOutlined />} allowClear placeholder="搜尋試卷" value={search} onChange={e=>setSearch(e.target.value)} /></div></div><Table rowKey="id" dataSource={rows} pagination={{pageSize:10,showSizeChanger:false}} scroll={{x:700}} locale={{emptyText:<Empty description="尚無試卷，點擊新建試卷開始組卷" />}} columns={[{title:'試卷名稱',dataIndex:'title',render:(title,p)=><button className="exam-title-button" onClick={()=>setPreview(p)}><FileTextOutlined /> {title}</button>},{title:'年級',dataIndex:'grade',render:value=><Tag>{value}</Tag>},{title:'學年／學期',render:(_,p)=><span>{p.academicYear} · {terms.find(x=>x.value===p.term)?.label}</span>},{title:'時長',render:(_,p)=>`${p.duration} 分鐘`},{title:'題數',render:(_,p)=>p.entries.length},{title:'總分',render:(_,p)=><b>{examMarks(p)} 分</b>},{title:'操作',render:(_,p)=><div className="actions"><Button size="small" onClick={()=>setPreview(p)}>預覽</Button><Button size="small" onClick={()=>setEditor(structuredClone(p))}>編輯</Button></div>}]} /></section>
  {editor&&<ExamEditor initial={editor} bank={bank} audios={audios} onCancel={()=>setEditor(null)} onSave={save} />}
- {preview&&<Modal open title="試卷預覽" width={960} className="exam-preview-modal" onCancel={()=>setPreview(null)} footer={<Button type="primary" onClick={()=>{setEditor(structuredClone(preview));setPreview(null);}}>編輯試卷</Button>}><ExamPreview paper={preview} audios={audios} /></Modal>}
+ {preview&&<Modal open title="試卷預覽" width={960} className="exam-preview-modal exam-print-modal" onCancel={()=>setPreview(null)} footer={<><Button icon={<PrinterOutlined />} onClick={()=>window.print()}>列印 / 另存 PDF</Button><Button type="primary" onClick={()=>{setEditor(structuredClone(preview));setPreview(null);}}>編輯試卷</Button></>}><ExamPreview paper={preview} audios={audios} /></Modal>}
  </>;
 }
 function ExamEditor({initial,bank,audios,onCancel,onSave}){

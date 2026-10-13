@@ -1,0 +1,6 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {teacherLessons,weekDates,dayStats} from '../src/teacherSchedule.js';
+test('week always runs Monday to Sunday across month boundaries',()=>{assert.deepEqual(weekDates('2026-11-01'),['2026-10-26','2026-10-27','2026-10-28','2026-10-29','2026-10-30','2026-10-31','2026-11-01']);});
+test('only own active lessons appear in chronological order',()=>{const base={teacherId:'t1',date:'2026-10-13',start:'12:00'};const db={sessions:[{...base,id:'later'},{...base,id:'first',start:'10:00'},{...base,id:'other',teacherId:'t2'},{...base,id:'cancelled',status:'cancelled'},{...base,id:'deleted',deletedAt:'date'}]};assert.deepEqual(teacherLessons(db,'t1',base.date).map(s=>s.id),['first','later']);});
+test('free time uses merged available intervals and subtracts only occupied availability',()=>{const teacher={weekly:[{days:[2],start:'10:00',end:'14:00'},{days:[2],start:'12:00',end:'16:00'}],extra:[],unavailable:[{date:'2026-10-13',start:'14:00',end:'15:00'}]};const lessons=[{start:'11:00',end:'12:00'},{start:'15:00',end:'16:00'},{start:'18:00',end:'19:00'}];assert.deepEqual(dayStats(teacher,lessons,'2026-10-13'),{count:3,teachingMinutes:180,freeMinutes:180});});

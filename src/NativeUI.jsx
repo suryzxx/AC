@@ -12,12 +12,12 @@ export function PageHeading({ children }) {
   return host ? createPortal(<div className="native-page-heading">{children}</div>, host) : null;
 }
 
-export function NativeSidebar({ menu, page, nav, roleLabel }) {
+export function NativeSidebar({ menu, page, nav, roleLabel, onTeacherLogin, onParentLogin }) {
   const groups = [[null, ['dashboard']], ['教學工作區', ['schedule', 'attendance']], ['教務工作區', ['teachers', 'students', 'courses', 'billing']], ['教學資源庫', ['audio', 'video', 'questions', 'papers']]];
   return <aside className="native-sidebar">
     <div className="native-app-identity"><span className="native-app-icon">ac.</span><div><b>AC Education</b><small>教務工作室</small></div></div>
     <nav aria-label="主要導覽">{groups.map(([label, keys]) => <section key={label || 'overview'}>{label && <h2>{label}</h2>}{menu.filter(m => keys.includes(m.key)).map(m => <button key={m.key} className={page === m.key ? 'selected' : ''} aria-current={page === m.key ? 'page' : undefined} title={m.label} aria-label={m.label} onClick={() => nav(m.key)}><span className={'native-nav-icon icon-' + m.key}><NavigationIcon name={m.key} /></span><span className="native-nav-label">{m.label}</span>{m.count > 0 && <em>{m.count}</em>}</button>)}</section>)}</nav>
-    <div className="native-account"><div><b>{roleLabel}</b><small>本機資料 · 香港</small></div></div>
+    <div className="native-account"><div><b>{roleLabel}</b>{onTeacherLogin && <Button type="text" className="native-account-switch" onClick={onTeacherLogin}>切換老師登入</Button>}{onParentLogin && <Button type="text" className="native-account-switch" onClick={onParentLogin}>切換家長登入</Button>}</div></div>
   </aside>;
 }
 
